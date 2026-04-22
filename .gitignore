@@ -1,0 +1,15 @@
+# Veri dosyaları
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Genel İşletim Sistemi dosyaları
+.DS_Store
+Thumbs.db

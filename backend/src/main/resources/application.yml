@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: advance-project-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/e_commerce
+    username: postgres
+    password: 604730
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Tabloları ETL oluşturduğu için JPA'nın silmesini engelliyoruz
+    show-sql: true # Konsolda SQL sorgularını görmek için
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080 # Backend uygulamamız 8080 portunda çalışacak
