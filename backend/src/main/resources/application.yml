@@ -19,3 +19,7 @@ spring:
 
 server:
   port: 8080 # Backend uygulamamız 8080 portunda çalışacak
+
+jwt:
+  secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a756b5c3d4e5f6
+  expiration: 36000000 # 10 hours in milliseconds

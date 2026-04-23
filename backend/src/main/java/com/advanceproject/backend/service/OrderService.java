@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class OrderService {
@@ -59,8 +60,26 @@ public class OrderService {
         return savedOrder;
     }
 
-    // Tüm siparişleri listeleme
     public List<Order> getAllOrders() {
         return orderRepository.findAll();
+    }
+
+    public Optional<Order> getOrderById(Integer id) {
+        return orderRepository.findById(id);
+    }
+
+    public Order updateOrder(Integer id, Order updatedOrder) {
+        return orderRepository.findById(id).map(order -> {
+            order.setStatus(updatedOrder.getStatus());
+            order.setPaymentMethod(updatedOrder.getPaymentMethod());
+            order.setGrandTotal(updatedOrder.getGrandTotal());
+            order.setUser(updatedOrder.getUser());
+            order.setStore(updatedOrder.getStore());
+            return orderRepository.save(order);
+        }).orElseThrow(() -> new RuntimeException("Order not found"));
+    }
+
+    public void deleteOrder(Integer id) {
+        orderRepository.deleteById(id);
     }
 }

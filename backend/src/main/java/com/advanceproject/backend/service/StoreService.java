@@ -38,4 +38,17 @@ public class StoreService {
     public List<Store> getAllStores() {
         return storeRepository.findAll();
     }
+
+    public Store updateStore(Integer id, Store updatedStore) {
+        return storeRepository.findById(id).map(store -> {
+            store.setName(updatedStore.getName());
+            store.setStatus(updatedStore.getStatus());
+            store.setOwner(updatedStore.getOwner());
+            return storeRepository.save(store);
+        }).orElseThrow(() -> new RuntimeException("Store not found"));
+    }
+
+    public void deleteStore(Integer id) {
+        storeRepository.deleteById(id);
+    }
 }

@@ -29,4 +29,22 @@ public class UserService {
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
+
+    public Optional<User> getUserById(Integer id) {
+        return userRepository.findById(id);
+    }
+
+    public User updateUser(Integer id, User updatedUser) {
+        return userRepository.findById(id).map(user -> {
+            user.setEmail(updatedUser.getEmail());
+            user.setPasswordHash(updatedUser.getPasswordHash());
+            user.setRoleType(updatedUser.getRoleType());
+            user.setGender(updatedUser.getGender());
+            return userRepository.save(user);
+        }).orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public void deleteUser(Integer id) {
+        userRepository.deleteById(id);
+    }
 }
