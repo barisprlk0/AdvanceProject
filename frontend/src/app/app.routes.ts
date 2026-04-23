@@ -20,8 +20,10 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard').then(m => m.DashboardComponent) },
-      { path: 'products', loadComponent: () => import('./features/products/product-list/product-list').then(m => m.ProductListComponent) },
       { path: 'orders', loadComponent: () => import('./features/orders/order-list/order-list').then(m => m.OrderListComponent) },
+      { path: 'orders/:id', loadComponent: () => import('./features/orders/order-detail/order-detail').then(m => m.OrderDetailComponent) },
+      { path: 'products', loadComponent: () => import('./features/products/product-list/product-list').then(m => m.ProductListComponent) },
+      { path: 'products/:id', loadComponent: () => import('./features/products/product-detail/product-detail').then(m => m.ProductDetailComponent) },
       { path: 'reviews', loadComponent: () => import('./features/reviews/reviews').then(m => m.ReviewsComponent) },
       { path: 'shipments', loadComponent: () => import('./features/shipments/shipments').then(m => m.ShipmentsComponent) },
       { path: 'analytics', loadComponent: () => import('./features/analytics/analytics').then(m => m.AnalyticsComponent) },

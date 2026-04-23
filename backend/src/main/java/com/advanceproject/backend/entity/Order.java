@@ -1,6 +1,7 @@
 package com.advanceproject.backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -40,4 +41,8 @@ public class Order {
 
     @Column(name = "grand_total", precision = 10, scale = 2)
     private BigDecimal grandTotal;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private java.util.List<OrderItem> items;
 }

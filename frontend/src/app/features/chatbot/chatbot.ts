@@ -1,6 +1,9 @@
-import { Component, signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, AfterViewChecked, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { ApiService } from '../../core/services/api.service';
+import { Order, Product, Review } from '../../core/models';
+import { firstValueFrom } from 'rxjs';
 
 interface ChatMsg {
   id: string;
@@ -17,28 +20,50 @@ interface ChatMsg {
   templateUrl: './chatbot.html',
   styleUrl: './chatbot.css'
 })
-export class ChatbotComponent implements AfterViewChecked {
+export class ChatbotComponent implements OnInit, AfterViewChecked {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
 
   inputText = signal('');
   showSql = signal<string | null>(null);
   private shouldScroll = false;
 
+  private products: Product[] = [];
+  private orders: Order[] = [];
+  private reviews: Review[] = [];
+
   messages = signal<ChatMsg[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Merhaba! 👋 Ben ShopLens AI Asistanı. E-ticaret verileriniz hakkında doğal dilde sorular sorabilirsiniz. Örneğin:\n\n• "Bu ayki toplam satış ne kadar?"\n• "En çok satılan 5 ürün hangileri?"\n• "Geçen aya göre sipariş artışı ne oldu?"',
+      content: 'Merhaba! 👋 Ben ShopLens AI Asistanı. E-ticaret verileriniz hakkında doğal dilde sorular sorabilirsiniz. Örneğin:\n\n• "Bu ayki toplam satış ne kadar?"\n• "En çok satılan 5 ürün hangileri?"\n• "Ortalama ürün fiyatı nedir?"',
       timestamp: new Date()
     }
   ]);
 
   suggestions = signal([
-    'Bu ayki toplam gelir ne kadar?',
-    'En çok satan 5 ürünü göster',
+    'Toplam gelir ne kadar?',
+    'En pahalı ürünü göster',
     'Müşteri memnuniyet ortalaması kaç?',
-    'Hangi kategoride en çok iade var?'
+    'Toplam kaç ürün var?'
   ]);
+
+  constructor(private api: ApiService) {}
+
+  async ngOnInit(): Promise<void> {
+    try {
+      // Load essential data for "local AI" simulation
+      const [p, o, r] = await Promise.all([
+        firstValueFrom(this.api.getAll<Product>('products')),
+        firstValueFrom(this.api.getAll<Order>('orders')),
+        firstValueFrom(this.api.getAll<Review>('reviews'))
+      ]);
+      this.products = p;
+      this.orders = o;
+      this.reviews = r;
+    } catch (e) {
+      console.error('Chatbot data loading failed', e);
+    }
+  }
 
   ngAfterViewChecked(): void {
     if (this.shouldScroll) {
@@ -68,10 +93,10 @@ export class ChatbotComponent implements AfterViewChecked {
       id: loadingId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true
     }]);
 
-    // Simulate AI response
-    await new Promise(resolve => setTimeout(resolve, 1200 + Math.random() * 800));
+    // Simulate thinking
+    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 600));
 
-    const response = this.getMockResponse(msg);
+    const response = this.generateResponse(msg);
 
     this.messages.update(msgs =>
       msgs.map(m => m.id === loadingId ? { ...response, id: loadingId } : m)
@@ -90,40 +115,53 @@ export class ChatbotComponent implements AfterViewChecked {
     }
   }
 
-  private getMockResponse(question: string): ChatMsg {
+  private generateResponse(question: string): ChatMsg {
     const q = question.toLowerCase();
+    const timestamp = new Date();
+
     if (q.includes('gelir') || q.includes('satış') || q.includes('ciro')) {
+      const total = this.orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
       return {
-        id: '', role: 'assistant', timestamp: new Date(),
-        content: 'Bu ayki toplam gelir **₺284,520** olarak gerçekleşti. Geçen aya göre **%12.5** artış gösterdi.\n\nEn yüksek gelir Elektronik kategorisinden (₺96,834) gelirken, onu Giyim (₺71,130) ve Aksesuar (₺51,214) takip ediyor.',
-        sql: 'SELECT SUM(oi.unit_price * oi.quantity) AS total_revenue\nFROM order_items oi\nJOIN orders o ON o.id = oi.order_id\nWHERE o.order_date >= DATE_TRUNC(\'month\', CURRENT_DATE);'
+        id: '', role: 'assistant', timestamp,
+        content: `Sistemdeki toplam gelir **₺${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}** olarak hesaplandı. Bu rakam toplam **${this.orders.length}** sipariş üzerinden elde edildi.`,
+        sql: 'SELECT SUM(grand_total) FROM orders;'
       };
     }
-    if (q.includes('ürün') || q.includes('satan')) {
+
+    if (q.includes('ürün') && (q.includes('en') || q.includes('top'))) {
+      const sorted = [...this.products].sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0)).slice(0, 5);
+      let content = 'En yüksek fiyatlı 5 ürün şunlar:\n\n';
+      sorted.forEach((p, i) => {
+        content += `${i + 1}. **${p.name || p.description}** — ₺${(p.unitPrice || 0).toLocaleString('tr-TR')}\n`;
+      });
       return {
-        id: '', role: 'assistant', timestamp: new Date(),
-        content: 'En çok satan 5 ürün şu şekilde:\n\n| # | Ürün | Satış | Gelir |\n|---|------|-------|-------|\n| 1 | Organik Yeşil Çay | 423 | ₺12,690 |\n| 2 | Kablosuz Kulaklık Pro | 342 | ₺68,400 |\n| 3 | Akıllı Saat Ultra | 281 | ₺84,300 |\n| 4 | Spor Ayakkabı X | 198 | ₺29,700 |\n| 5 | Deri Çanta Classic | 156 | ₺46,800 |',
-        sql: 'SELECT p.description, SUM(oi.quantity) AS total_sold,\n       SUM(oi.unit_price * oi.quantity) AS revenue\nFROM order_items oi\nJOIN products p ON p.id = oi.product_id\nGROUP BY p.id, p.description\nORDER BY total_sold DESC\nLIMIT 5;'
+        id: '', role: 'assistant', timestamp,
+        content,
+        sql: 'SELECT name, unit_price FROM products ORDER BY unit_price DESC LIMIT 5;'
       };
     }
-    if (q.includes('müşteri') || q.includes('memnuniyet')) {
+
+    if (q.includes('kaç') && q.includes('ürün')) {
       return {
-        id: '', role: 'assistant', timestamp: new Date(),
-        content: 'Müşteri memnuniyet ortalaması **4.6 / 5.0** olarak hesaplanmıştır.\n\nDağılım:\n- ⭐⭐⭐⭐⭐ 5 yıldız: %42\n- ⭐⭐⭐⭐ 4 yıldız: %31\n- ⭐⭐⭐ 3 yıldız: %18\n- ⭐⭐ 2 yıldız: %6\n- ⭐ 1 yıldız: %3\n\nGeçen aya göre 0.2 puan artış var.',
-        sql: 'SELECT AVG(star_rating) AS avg_rating,\n       COUNT(*) AS total_reviews\nFROM reviews\nWHERE created_at >= DATE_TRUNC(\'month\', CURRENT_DATE);'
+        id: '', role: 'assistant', timestamp,
+        content: `Şu anda veritabanımızda toplam **${this.products.length}** adet ürün tanımlı.`,
+        sql: 'SELECT COUNT(*) FROM products;'
       };
     }
-    if (q.includes('iade') || q.includes('iptal')) {
+
+    if (q.includes('memnuniyet') || q.includes('puan') || q.includes('yıldız')) {
+      const avg = this.reviews.length > 0 ? this.reviews.reduce((s, r) => s + (r.starRating || 0), 0) / this.reviews.length : 0;
       return {
-        id: '', role: 'assistant', timestamp: new Date(),
-        content: 'İade oranı en yüksek kategoriler:\n\n1. **Giyim** — %8.2 (beden uyumsuzluğu)\n2. **Elektronik** — %4.1 (arıza/beklenti)\n3. **Gıda** — %2.8 (hasar)\n\nGenel iade oranı **%4.7** ile sektör ortalamasının altında.',
-        sql: 'SELECT c.name AS category,\n       COUNT(CASE WHEN o.status = \'RETURNED\' THEN 1 END) * 100.0 / COUNT(*) AS return_rate\nFROM orders o\nJOIN order_items oi ON o.id = oi.order_id\nJOIN products p ON p.id = oi.product_id\nJOIN categories c ON c.id = p.category_id\nGROUP BY c.name\nORDER BY return_rate DESC;'
+        id: '', role: 'assistant', timestamp,
+        content: `Müşteri memnuniyet ortalaması **${avg.toFixed(1)} / 5.0** düzeyinde. Toplam **${this.reviews.length}** yorum analiz edildi.`,
+        sql: 'SELECT AVG(star_rating) FROM reviews;'
       };
     }
+
     return {
-      id: '', role: 'assistant', timestamp: new Date(),
-      content: 'İlginç bir soru! Şu an veritabanınızda bu konuyla ilgili analiz yapıyorum.\n\nSonuçlara göre, platformda toplam **12,493 aktif müşteri** ve **3,281 ürün** bulunuyor. Daha spesifik bir soru sorarsanız daha detaylı analiz sunabilirim.',
-      sql: 'SELECT\n  (SELECT COUNT(*) FROM users WHERE role = \'INDIVIDUAL\') AS total_customers,\n  (SELECT COUNT(*) FROM products) AS total_products;'
+      id: '', role: 'assistant', timestamp,
+      content: `İlginç bir soru! Şu an sistemde **${this.products.length}** ürün, **${this.orders.length}** sipariş ve **${this.reviews.length}** yorum bulunuyor. Bu veriler ışığında daha spesifik (gelir, fiyatlar, memnuniyet vb.) bir soru sorarsanız detaylı yanıt verebilirim.`,
+      sql: 'SELECT COUNT(*) FROM products; SELECT COUNT(*) FROM orders;'
     };
   }
 }

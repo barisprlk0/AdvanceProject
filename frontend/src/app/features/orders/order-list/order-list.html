@@ -39,8 +39,8 @@
       </thead>
       <tbody>
         @for (order of orders(); track order.id) {
-          <tr>
-            <td><span class="order-id">{{ order.id }}</span></td>
+          <tr [routerLink]="['/orders', order.id]" class="clickable-row">
+            <td><span class="order-id">#{{ order.id }}</span></td>
             <td>
               <div class="customer-cell">
                 <div class="customer-avatar" [style.background]="'hsl(' + ((order.id || '').toString().length * 47 % 360) + ', 50%, 88%)'">
@@ -53,16 +53,17 @@
               </div>
             </td>
             <td>{{ order.items }} ürün</td>
-            <td class="font-medium">₺{{ order.amount.toLocaleString('tr-TR', {minimumFractionDigits: 2}) }}</td>
+            <td class="font-medium">{{ order.amount | currency:'TRY':'symbol':'1.2-2':'tr-TR' }}</td>
             <td class="text-muted">{{ order.payment }}</td>
             <td><span class="badge" [class]="'badge-' + order.statusKey">{{ order.status }}</span></td>
             <td class="text-muted text-sm">{{ order.date }}</td>
             <td>
-              <button class="btn btn-ghost btn-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-                </svg>
-              </button>
+              <select class="form-select status-select" (change)="updateOrderStatus(order, $any($event.target).value, $event)" (click)="$event.stopPropagation()">
+                <option [selected]="order.status === 'Processing'" value="Processing">Hazırlanıyor</option>
+                <option [selected]="order.status === 'Shipped'" value="Shipped">Kargoda</option>
+                <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
+                <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
+              </select>
             </td>
           </tr>
         }

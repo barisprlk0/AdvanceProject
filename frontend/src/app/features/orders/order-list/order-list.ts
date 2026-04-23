@@ -1,9 +1,13 @@
 import { Component, signal, OnInit } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { Order } from '../../../core/models';
+import { ToastService } from '../../../core/services/toast.service';
+import { CurrencyPipe } from '@angular/common';
 
 @Component({
   selector: 'app-order-list',
+  imports: [RouterLink, CurrencyPipe],
   templateUrl: './order-list.html',
   styleUrl: './order-list.css'
 })
@@ -16,13 +20,19 @@ export class OrderListComponent implements OnInit {
     { key: 'all', label: 'Tümü', count: 0 },
   ]);
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private toast: ToastService) {}
 
   ngOnInit(): void {
+    this.fetchOrders();
+  }
+
+  fetchOrders(): void {
+    this.loading.set(true);
     this.api.getAll<Order>('orders').subscribe({
       next: (data) => {
         const mapped = data.map(o => ({
-          id: `ORD-${o.id}`,
+          id: o.id,
+          displayId: `ORD-${o.id}`,
           customer: o.user?.email?.split('@')[0] || `Müşteri #${o.user?.id || '?'}`,
           email: o.user?.email || '—',
           items: '—',
@@ -37,6 +47,17 @@ export class OrderListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false)
+    });
+  }
+
+  updateOrderStatus(order: any, newStatus: string, event: Event): void {
+    event.stopPropagation();
+    this.api.patch('orders', order.id, { status: newStatus }).subscribe({
+      next: () => {
+        this.toast.success('Sipariş durumu güncellendi.');
+        this.fetchOrders();
+      },
+      error: () => this.toast.error('Güncelleme başarısız.')
     });
   }
 

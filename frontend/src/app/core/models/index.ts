@@ -77,6 +77,7 @@ export interface Order {
   orderDate: string;
   paymentMethod: string;
   grandTotal: number;
+  items?: OrderItem[];
 }
 
 // --- OrderItem ---
