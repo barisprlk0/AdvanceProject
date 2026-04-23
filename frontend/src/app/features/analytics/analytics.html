@@ -1,0 +1,143 @@
+<div class="analytics-page fade-in">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Analitik</h1>
+      <p class="page-subtitle">Detaylı performans analizi ve raporları</p>
+    </div>
+    <div class="header-actions">
+      <div class="date-range">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Son 30 Gün
+      </div>
+      <button class="btn btn-primary btn-sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Rapor İndir
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Toplam Satış</div>
+      <div class="kpi-value">₺284,520</div>
+      <div class="kpi-change positive">↑ 12.5% geçen aya göre</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ortalama Sipariş</div>
+      <div class="kpi-value">₺154.20</div>
+      <div class="kpi-change positive">↑ 3.2% geçen aya göre</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Dönüşüm Oranı</div>
+      <div class="kpi-value">%3.8</div>
+      <div class="kpi-change negative">↓ 0.4% geçen aya göre</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Müşteri Memnuniyeti</div>
+      <div class="kpi-value">4.6 / 5.0</div>
+      <div class="kpi-change positive">↑ 0.2 geçen aya göre</div>
+    </div>
+  </div>
+
+  <!-- Charts Grid -->
+  <div class="charts-grid">
+    <div class="card chart-card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Haftalık Satış Trendi</h3>
+          <p class="card-subtitle">Bu haftanın günlük satış verileri</p>
+        </div>
+      </div>
+      <div class="chart-wrapper"><canvas #salesChart></canvas></div>
+    </div>
+    <div class="card chart-card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Sipariş Sayıları</h3>
+          <p class="card-subtitle">Günlük sipariş adetleri</p>
+        </div>
+      </div>
+      <div class="chart-wrapper"><canvas #ordersChart></canvas></div>
+    </div>
+    <div class="card chart-card-wide">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Gelir & Gider Karşılaştırması</h3>
+          <p class="card-subtitle">Aylık finansal performans</p>
+        </div>
+      </div>
+      <div class="chart-wrapper-lg"><canvas #revenueBarChart></canvas></div>
+    </div>
+    <div class="card chart-card-small">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Müşteri Segmentasyonu</h3>
+          <p class="card-subtitle">Müşteri türü dağılımı</p>
+        </div>
+      </div>
+      <div class="chart-wrapper-sm"><canvas #customerChart></canvas></div>
+    </div>
+  </div>
+
+  <!-- Bottom section -->
+  <div class="analytics-bottom">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">En İyi Performans Gösteren Kategoriler</h3>
+      </div>
+      <div class="category-list">
+        <div class="category-item">
+          <div class="category-info">
+            <span class="category-rank">#1</span>
+            <span class="category-name">Elektronik</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" style="width: 85%; background: #4f46e5;"></div>
+          </div>
+          <span class="category-value">₺96,834</span>
+        </div>
+        <div class="category-item">
+          <div class="category-info">
+            <span class="category-rank">#2</span>
+            <span class="category-name">Giyim</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" style="width: 62%; background: #0891b2;"></div>
+          </div>
+          <span class="category-value">₺71,130</span>
+        </div>
+        <div class="category-item">
+          <div class="category-info">
+            <span class="category-rank">#3</span>
+            <span class="category-name">Aksesuar</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" style="width: 48%; background: #f59e0b;"></div>
+          </div>
+          <span class="category-value">₺51,214</span>
+        </div>
+        <div class="category-item">
+          <div class="category-info">
+            <span class="category-rank">#4</span>
+            <span class="category-name">Ev & Yaşam</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" style="width: 35%; background: #10b981;"></div>
+          </div>
+          <span class="category-value">₺38,742</span>
+        </div>
+        <div class="category-item">
+          <div class="category-info">
+            <span class="category-rank">#5</span>
+            <span class="category-name">Gıda</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" style="width: 24%; background: #ec4899;"></div>
+          </div>
+          <span class="category-value">₺26,600</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,51 @@
+import { Component, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../../core/services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  imports: [FormsModule, RouterLink],
+  templateUrl: './login.html',
+  styleUrl: './login.css'
+})
+export class LoginComponent {
+  email = signal('');
+  password = signal('');
+  isLoading = signal(false);
+  errorMessage = signal('');
+  showPassword = signal(false);
+
+  constructor(private auth: AuthService, private router: Router) {}
+
+  async onSubmit(): Promise<void> {
+    if (!this.email() || !this.password()) {
+      this.errorMessage.set('Lütfen tüm alanları doldurun.');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    try {
+      const success = await this.auth.login({
+        email: this.email(),
+        password: this.password()
+      });
+
+      if (success) {
+        this.router.navigate(['/dashboard']);
+      } else {
+        this.errorMessage.set('E-posta veya şifre hatalı.');
+      }
+    } catch {
+      this.errorMessage.set('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  togglePassword(): void {
+    this.showPassword.update(v => !v);
+  }
+}

@@ -1,0 +1,187 @@
+<div class="dashboard fade-in">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ greeting() }}</h1>
+      <p class="page-subtitle">İşte bugünkü platform özetiniz.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Rapor İndir
+      </button>
+      <button class="btn btn-primary btn-sm" routerLink="/analytics">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        Detaylı Analiz
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    @for (stat of stats(); track stat.label; let i = $index) {
+      <div class="stat-card" [style.animation-delay]="(i * 80) + 'ms'">
+        <div class="stat-header">
+          <span class="stat-icon" [attr.data-type]="stat.icon">
+            @switch (stat.icon) {
+              @case ('revenue') {
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+              }
+              @case ('orders') {
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                </svg>
+              }
+              @case ('customers') {
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              }
+              @case ('products') {
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+              }
+            }
+          </span>
+          <span class="stat-change" [class.positive]="stat.positive" [class.negative]="!stat.positive">
+            @if (stat.positive) { ↑ } @else { ↓ }
+            {{ stat.change }}
+          </span>
+        </div>
+        <div class="stat-value">{{ stat.value }}</div>
+        <div class="stat-label">{{ stat.label }}</div>
+      </div>
+    }
+  </div>
+
+  <!-- Charts Row -->
+  <div class="charts-row">
+    <div class="card chart-card-large">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Gelir Trendi</h3>
+          <p class="card-subtitle">Aylık gelir karşılaştırması</p>
+        </div>
+        <div class="chart-tabs">
+          <button class="chart-tab active">12 Ay</button>
+          <button class="chart-tab">6 Ay</button>
+          <button class="chart-tab">30 Gün</button>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas #revenueChart></canvas>
+      </div>
+    </div>
+
+    <div class="card chart-card-small">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Kategori Dağılımı</h3>
+          <p class="card-subtitle">Satış bazlı</p>
+        </div>
+      </div>
+      <div class="chart-wrapper donut-wrapper">
+        <canvas #categoryChart></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Row -->
+  <div class="bottom-row">
+    <!-- Recent Orders -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Son Siparişler</h3>
+          <p class="card-subtitle">Son 24 saat</p>
+        </div>
+        <a routerLink="/orders" class="btn btn-ghost btn-sm">Tümünü Gör →</a>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Sipariş</th>
+            <th>Müşteri</th>
+            <th>Tutar</th>
+            <th>Durum</th>
+            <th>Tarih</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of recentOrders(); track order.id) {
+            <tr>
+              <td><span class="order-id">{{ order.id }}</span></td>
+              <td>{{ order.customer }}</td>
+              <td class="font-medium">{{ order.amount }}</td>
+              <td><span class="badge" [class]="'badge-' + order.statusClass">{{ order.status }}</span></td>
+              <td class="text-muted">{{ order.date }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Right column -->
+    <div class="right-col">
+      <!-- Top Products -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">En Çok Satanlar</h3>
+            <p class="card-subtitle">Bu ay</p>
+          </div>
+        </div>
+        <div class="top-products">
+          @for (product of topProducts(); track product.name; let i = $index) {
+            <div class="product-row">
+              <span class="product-rank">{{ i + 1 }}</span>
+              <div class="product-info">
+                <span class="product-name">{{ product.name }}</span>
+                <span class="product-category">{{ product.category }} · {{ product.sold }} satış</span>
+              </div>
+              <div class="product-stats">
+                <span class="product-revenue">{{ product.revenue }}</span>
+                <span class="product-trend positive">{{ product.trend }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Son Aktiviteler</h3>
+        </div>
+        <div class="activity-feed">
+          @for (activity of activities(); track activity.time) {
+            <div class="activity-item">
+              <div class="activity-dot" [attr.data-type]="activity.type"></div>
+              <div class="activity-content">
+                <span class="activity-text">{{ activity.text }}</span>
+                <span class="activity-detail">{{ activity.detail }}</span>
+              </div>
+              <span class="activity-time">{{ activity.time }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

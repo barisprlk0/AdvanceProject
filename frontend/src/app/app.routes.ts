@@ -1,3 +1,56 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
-export const routes: Routes = [];
+export const routes: Routes = [
+  // Auth routes
+  {
+    path: '',
+    loadComponent: () => import('./layouts/auth-layout/auth-layout').then(m => m.AuthLayoutComponent),
+    children: [
+      { path: 'login', loadComponent: () => import('./features/auth/login/login').then(m => m.LoginComponent) },
+      { path: 'register', loadComponent: () => import('./features/auth/register/register').then(m => m.RegisterComponent) },
+    ]
+  },
+
+  // Main app routes
+  {
+    path: '',
+    loadComponent: () => import('./layouts/main-layout/main-layout').then(m => m.MainLayoutComponent),
+    canActivate: [authGuard],
+    children: [
+      { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard').then(m => m.DashboardComponent) },
+      { path: 'products', loadComponent: () => import('./features/products/product-list/product-list').then(m => m.ProductListComponent) },
+      { path: 'orders', loadComponent: () => import('./features/orders/order-list/order-list').then(m => m.OrderListComponent) },
+      { path: 'reviews', loadComponent: () => import('./features/reviews/reviews').then(m => m.ReviewsComponent) },
+      { path: 'shipments', loadComponent: () => import('./features/shipments/shipments').then(m => m.ShipmentsComponent) },
+      { path: 'analytics', loadComponent: () => import('./features/analytics/analytics').then(m => m.AnalyticsComponent) },
+      { path: 'chatbot', loadComponent: () => import('./features/chatbot/chatbot').then(m => m.ChatbotComponent) },
+      { path: 'profile', loadComponent: () => import('./features/profile/profile').then(m => m.ProfileComponent) },
+
+      // Admin routes
+      {
+        path: 'users',
+        loadComponent: () => import('./features/users/user-list').then(m => m.UserListComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] }
+      },
+      {
+        path: 'stores',
+        loadComponent: () => import('./features/stores/store-list').then(m => m.StoreListComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] }
+      },
+      {
+        path: 'categories',
+        loadComponent: () => import('./features/categories/categories').then(m => m.CategoriesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] }
+      },
+    ]
+  },
+
+  // Redirects
+  { path: '', redirectTo: '/login', pathMatch: 'full' },
+  { path: '**', redirectTo: '/dashboard' },
+];

@@ -1,0 +1,73 @@
+<div class="register-container fade-in">
+  <h1 class="auth-title">Hesap Oluşturun</h1>
+  <p class="auth-description">Platformu kullanmaya hemen başlayın.</p>
+
+  @if (errorMessage()) {
+    <div class="alert alert-error">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="15" y1="9" x2="9" y2="15"/>
+        <line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
+  <form (ngSubmit)="onSubmit()" class="auth-form">
+    <!-- Role selection -->
+    <div class="form-group">
+      <label class="form-label">Hesap Türü</label>
+      <div class="role-selector">
+        <button type="button" class="role-option" [class.active]="roleType() === 'Individual'" (click)="roleType.set('Individual')">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span class="role-name">Bireysel</span>
+          <span class="role-desc">Alışveriş, sipariş takibi</span>
+        </button>
+        <button type="button" class="role-option" [class.active]="roleType() === 'Corporate'" (click)="roleType.set('Corporate')">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/>
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+            <rect x="2" y="7" width="20" height="5" rx="1"/>
+          </svg>
+          <span class="role-name">Kurumsal</span>
+          <span class="role-desc">Mağaza, satış yönetimi</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="regEmail">E-posta</label>
+      <input id="regEmail" type="email" class="form-input" placeholder="ornek@firma.com"
+             [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" autocomplete="email">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="regPassword">Şifre</label>
+      <input id="regPassword" type="password" class="form-input" placeholder="En az 6 karakter"
+             [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" autocomplete="new-password">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="confirmPassword">Şifre Tekrar</label>
+      <input id="confirmPassword" type="password" class="form-input" placeholder="Şifrenizi tekrar girin"
+             [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" name="confirmPassword" autocomplete="new-password">
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg btn-full" [disabled]="isLoading()">
+      @if (isLoading()) {
+        <span class="spinner"></span>
+        <span>Kayıt oluşturuluyor...</span>
+      } @else {
+        <span>Kayıt Ol</span>
+      }
+    </button>
+  </form>
+
+  <p class="auth-switch">
+    Zaten hesabınız var mı?
+    <a routerLink="/login" class="auth-switch-link">Giriş yapın</a>
+  </p>
+</div>
