@@ -39,6 +39,10 @@ public class StoreService {
         return storeRepository.findAll();
     }
 
+    public List<Store> getStoresByOwnerId(Integer ownerId) {
+        return storeRepository.findByOwnerId(ownerId);
+    }
+
     public Store updateStore(Integer id, Store updatedStore) {
         return storeRepository.findById(id).map(store -> {
             store.setName(updatedStore.getName());

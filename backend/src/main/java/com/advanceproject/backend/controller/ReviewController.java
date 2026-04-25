@@ -1,9 +1,14 @@
 package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.entity.Review;
+import com.advanceproject.backend.entity.User;
 import com.advanceproject.backend.service.ReviewService;
+import com.advanceproject.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,10 +18,12 @@ import java.util.List;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final UserService userService;
 
     @Autowired
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService, UserService userService) {
         this.reviewService = reviewService;
+        this.userService = userService;
     }
 
     @PostMapping
@@ -25,8 +32,15 @@ public class ReviewController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Review>> getAllReviews() {
-        return ResponseEntity.ok(reviewService.getAllReviews());
+    public ResponseEntity<Page<Review>> getAllReviews(Pageable pageable, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if ("CORPORATE".equalsIgnoreCase(user.getRoleType())) {
+            return ResponseEntity.ok(reviewService.getReviewsByOwnerId(user.getId(), pageable));
+        }
+
+        return ResponseEntity.ok(reviewService.getAllReviews(pageable));
     }
 
     @GetMapping("/{id}")
@@ -37,12 +51,34 @@ public class ReviewController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Review> updateReview(@PathVariable Integer id, @RequestBody Review review) {
+    public ResponseEntity<Review> updateReview(@PathVariable Integer id, @RequestBody Review review, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Review existingReview = reviewService.getReviewById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && 
+            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
         return ResponseEntity.ok(reviewService.updateReview(id, review));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteReview(@PathVariable Integer id) {
+    public ResponseEntity<Void> deleteReview(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Review existingReview = reviewService.getReviewById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && 
+            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
         reviewService.deleteReview(id);
         return ResponseEntity.noContent().build();
     }

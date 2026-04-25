@@ -197,7 +197,8 @@ class ETLPipeline:
             users_master.loc[0, 'role_type'] = 'admin'
         
         users_master['email'] = users_master['ext_id'].apply(lambda x: f"user_{x}@example.com")
-        users_master['password_hash'] = 'argon2_hashed_pw'
+        # Use a real BCrypt hash for 'password123' so Spring Security can verify it
+        users_master['password_hash'] = '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.TVuHOn2'
         users_master['gender'] = users_master['gender_ds2'].fillna(users_master.get('gender_ds3', 'Unknown')).str.slice(0, 10)
         
         users_final = users_master[['email', 'password_hash', 'role_type', 'gender']].drop_duplicates(subset=['email'])

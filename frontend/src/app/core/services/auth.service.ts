@@ -11,6 +11,7 @@ export class AuthService {
 
   readonly user = this.currentUser.asReadonly();
   readonly isAuthenticated = computed(() => !!this.token());
+  readonly userId = computed(() => this.currentUser()?.id || null);
   readonly userRole = computed<UserRole | null>(() => {
     const u = this.currentUser();
     return u ? mapRoleType(u.roleType) : null;
@@ -22,14 +23,18 @@ export class AuthService {
   private loadUserFromStorage(): User | null {
     try {
       const data = localStorage.getItem('sl_user');
-      return data ? JSON.parse(data) : null;
-    } catch {
+      if (!data || data === 'undefined') return null;
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Error loading user from storage', e);
       return null;
     }
   }
 
   private loadTokenFromStorage(): string | null {
-    return localStorage.getItem('sl_token');
+    const token = localStorage.getItem('sl_token');
+    if (!token || token === 'null' || token === 'undefined') return null;
+    return token;
   }
 
   getToken(): string | null {
@@ -38,51 +43,35 @@ export class AuthService {
 
   async login(request: LoginRequest): Promise<boolean> {
     try {
-      // 1) Backend login → {token, email}
       const authResp = await firstValueFrom(
         this.http.post<AuthResponse>('/api/auth/login', request)
       );
 
-      // 2) Token'ı kaydet
       localStorage.setItem('sl_token', authResp.token);
       this.token.set(authResp.token);
 
-      // 3) Kullanıcı bilgisini çek
-      const users = await firstValueFrom(
-        this.http.get<User[]>('/api/users', {
-          headers: { 'Authorization': `Bearer ${authResp.token}` }
-        })
-      );
-      const user = users.find(u => u.email === authResp.email) || null;
-
-      if (user) {
-        localStorage.setItem('sl_user', JSON.stringify(user));
-        this.currentUser.set(user);
-      } else {
-        // Fallback: minimal user from email
-        const fallbackUser: User = {
-          id: 0,
-          email: authResp.email,
-          roleType: this.guessRoleFromEmail(authResp.email)
-        };
-        localStorage.setItem('sl_user', JSON.stringify(fallbackUser));
-        this.currentUser.set(fallbackUser);
-      }
-
-      return true;
-    } catch (err) {
-      console.warn('Backend login failed, using demo mode:', err);
-      // Demo fallback
-      const demoUser: User = {
-        id: 0,
-        email: request.email,
-        roleType: this.guessRoleFromEmail(request.email)
+      const user: User = {
+        id: authResp.id,
+        email: authResp.email,
+        roleType: authResp.roleType,
+        gender: authResp.gender
       };
+
+      localStorage.setItem('sl_user', JSON.stringify(user));
+      this.currentUser.set(user);
+      return true;
+    } catch (err: any) {
+      console.error('Backend login failed:', err);
+      // If you want to force demo mode for testing, you can uncomment this
+      /*
+      const demoUser: User = { id: 0, email: request.email, roleType: 'ADMIN' };
       localStorage.setItem('sl_token', 'demo-token-' + Date.now());
       localStorage.setItem('sl_user', JSON.stringify(demoUser));
       this.token.set('demo-token-' + Date.now());
       this.currentUser.set(demoUser);
       return true;
+      */
+      throw err;
     }
   }
 
@@ -95,9 +84,10 @@ export class AuthService {
       this.token.set(authResp.token);
 
       const user: User = {
-        id: 0,
+        id: authResp.id,
         email: authResp.email,
-        roleType: request.roleType || 'Individual'
+        roleType: authResp.roleType,
+        gender: authResp.gender
       };
       localStorage.setItem('sl_user', JSON.stringify(user));
       this.currentUser.set(user);
@@ -115,6 +105,11 @@ export class AuthService {
       this.currentUser.set(user);
       return true;
     }
+  }
+
+  updateCurrentUser(user: User): void {
+    localStorage.setItem('sl_user', JSON.stringify(user));
+    this.currentUser.set(user);
   }
 
   logout(): void {

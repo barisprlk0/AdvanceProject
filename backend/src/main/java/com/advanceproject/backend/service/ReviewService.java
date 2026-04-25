@@ -3,6 +3,8 @@ package com.advanceproject.backend.service;
 import com.advanceproject.backend.entity.Review;
 import com.advanceproject.backend.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +30,18 @@ public class ReviewService {
 
     public List<Review> getAllReviews() {
         return reviewRepository.findAll();
+    }
+
+    public List<Review> getReviewsByOwnerId(Integer ownerId) {
+        return reviewRepository.findByProductStoreOwnerId(ownerId);
+    }
+
+    public Page<Review> getAllReviews(Pageable pageable) {
+        return reviewRepository.findAll(pageable);
+    }
+
+    public Page<Review> getReviewsByOwnerId(Integer ownerId, Pageable pageable) {
+        return reviewRepository.findByProductStoreOwnerId(ownerId, pageable);
     }
 
     public Review updateReview(Integer id, Review updatedReview) {

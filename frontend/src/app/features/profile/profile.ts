@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
+import { ApiService } from '../../core/services/api.service';
+import { ToastService } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-profile',
@@ -29,15 +31,27 @@ import { AuthService } from '../../core/services/auth.service';
         <div class="profile-forms">
           <div class="card">
             <h3 class="card-title" style="margin-bottom:20px">Hesap Bilgileri</h3>
-            <div class="form-group"><label class="form-label">E-posta</label><input class="form-input" [value]="auth.user()?.email||''"></div>
-            <button class="btn btn-primary">Değişiklikleri Kaydet</button>
+            <div class="form-group">
+              <label class="form-label">E-posta</label>
+              <input class="form-input" [(ngModel)]="email" placeholder="ornek@mail.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cinsiyet</label>
+              <select class="form-select" [(ngModel)]="gender">
+                <option value="Male">Erkek</option>
+                <option value="Female">Kadın</option>
+                <option value="Other">Diğer</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" (click)="saveProfile()" [disabled]="isLoading()">
+              @if (isLoading()) { <span class="spinner spinner-sm"></span> Kaydediliyor... } @else { Değişiklikleri Kaydet }
+            </button>
           </div>
           <div class="card">
             <h3 class="card-title" style="margin-bottom:20px">Şifre Değiştir</h3>
             <div class="form-group"><label class="form-label">Mevcut Şifre</label><input class="form-input" type="password" placeholder="••••••••"></div>
             <div class="form-group"><label class="form-label">Yeni Şifre</label><input class="form-input" type="password" placeholder="••••••••"></div>
-            <div class="form-group"><label class="form-label">Yeni Şifre (Tekrar)</label><input class="form-input" type="password" placeholder="••••••••"></div>
-            <button class="btn btn-primary">Şifreyi Güncelle</button>
+            <button class="btn btn-primary" (click)="updatePassword()">Şifreyi Güncelle</button>
           </div>
         </div>
       </div>
@@ -59,5 +73,45 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class ProfileComponent {
-  constructor(public auth: AuthService) {}
+  email = '';
+  gender = '';
+  isLoading = signal(false);
+
+  constructor(
+    public auth: AuthService,
+    private api: ApiService,
+    private toast: ToastService
+  ) {
+    const user = this.auth.user();
+    if (user) {
+      this.email = user.email;
+      this.gender = user.gender || '';
+    }
+  }
+
+  saveProfile(): void {
+    const user = this.auth.user();
+    if (!user) return;
+
+    this.isLoading.set(true);
+    this.api.update('users', user.id, {
+      ...user,
+      email: this.email,
+      gender: this.gender
+    }).subscribe({
+      next: (updatedUser: any) => {
+        this.isLoading.set(false);
+        this.toast.success('Profil başarıyla güncellendi.');
+        this.auth.updateCurrentUser(updatedUser); 
+      },
+      error: () => {
+        this.isLoading.set(false);
+        this.toast.error('Güncelleme sırasında bir hata oluştu.');
+      }
+    });
+  }
+
+  updatePassword(): void {
+    this.toast.info('Şifre güncelleme özelliği şu an aktif değil.');
+  }
 }

@@ -7,6 +7,8 @@ import com.advanceproject.backend.entity.Store;
 import com.advanceproject.backend.repository.OrderRepository;
 import com.advanceproject.backend.repository.OrderItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -26,32 +28,28 @@ public class OrderService {
         this.orderItemRepository = orderItemRepository;
     }
 
-    // Yeni Sipariş Oluşturma (İş Kuralları burada işliyor)
-    public Order createOrder(User user, Store store, List<OrderItem> items, String paymentMethod) {
-        Order newOrder = new Order();
-        newOrder.setUser(user);
-        newOrder.setStore(store);
-        newOrder.setOrderDate(LocalDateTime.now());
-        newOrder.setStatus("pending"); // Yeni sipariş her zaman beklemededir
-        newOrder.setPaymentMethod(paymentMethod);
-
-        // Toplam tutarı hesaplama mantığı (Business Logic)
-        BigDecimal grandTotal = BigDecimal.ZERO;
-        if (items != null) {
-            for (OrderItem item : items) {
-                // Fiyat ile miktarı çarpıyoruz: price * quantity
-                BigDecimal itemTotal = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
-                grandTotal = grandTotal.add(itemTotal);
-            }
+    public Order createOrder(Order order) {
+        if (order.getOrderDate() == null) {
+            order.setOrderDate(LocalDateTime.now());
         }
-        newOrder.setGrandTotal(grandTotal);
+        if (order.getStatus() == null) {
+            order.setStatus("Pending");
+        }
+        
+        // If items are provided, calculate total, otherwise keep the incoming grandTotal
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            BigDecimal total = BigDecimal.ZERO;
+            for (OrderItem item : order.getItems()) {
+                BigDecimal itemTotal = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
+                total = total.add(itemTotal);
+            }
+            order.setGrandTotal(total);
+        }
 
-        // Önce siparişi veritabanına kaydediyoruz
-        Order savedOrder = orderRepository.save(newOrder);
+        Order savedOrder = orderRepository.save(order);
 
-        // Sonra siparişin içindeki ürünleri (order_items) veritabanına kaydediyoruz
-        if (items != null) {
-            for (OrderItem item : items) {
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
                 item.setOrder(savedOrder);
                 orderItemRepository.save(item);
             }
@@ -64,8 +62,39 @@ public class OrderService {
         return orderRepository.findAll();
     }
 
+    public Page<Order> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable);
+    }
+
+    public Page<Order> getOrdersByUserId(Integer userId, Pageable pageable) {
+        return orderRepository.findByUserId(userId, pageable);
+    }
+
+    public List<Order> getOrdersByUserId(Integer userId) {
+        return orderRepository.findByUserId(userId);
+    }
+
+    public Page<Order> getOrdersByStoreOwnerId(Integer ownerId, Pageable pageable) {
+        return orderRepository.findByStore_Owner_Id(ownerId, pageable);
+    }
+
+    public List<Order> getOrdersByStoreOwnerId(Integer ownerId) {
+        return orderRepository.findByStore_Owner_Id(ownerId);
+    }
+
     public Optional<Order> getOrderById(Integer id) {
         return orderRepository.findById(id);
+    }
+
+    public Order patchOrder(Integer id, Order partialOrder) {
+        return orderRepository.findById(id).map(order -> {
+            if (partialOrder.getStatus() != null) order.setStatus(partialOrder.getStatus());
+            if (partialOrder.getPaymentMethod() != null) order.setPaymentMethod(partialOrder.getPaymentMethod());
+            if (partialOrder.getGrandTotal() != null) order.setGrandTotal(partialOrder.getGrandTotal());
+            if (partialOrder.getUser() != null) order.setUser(partialOrder.getUser());
+            if (partialOrder.getStore() != null) order.setStore(partialOrder.getStore());
+            return orderRepository.save(order);
+        }).orElseThrow(() -> new RuntimeException("Order not found"));
     }
 
     public Order updateOrder(Integer id, Order updatedOrder) {
