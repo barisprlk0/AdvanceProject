@@ -24,15 +24,17 @@ export class SidebarComponent {
     const role = this.auth.userRole();
     const all: NavItem[] = [
       { label: 'Dashboard', icon: 'dashboard', route: '/app/dashboard' },
-      { label: 'Ürünler', icon: 'products', route: '/app/products' },
-      { label: 'Siparişler', icon: 'orders', route: '/app/orders' },
+      { label: 'Urunler', icon: 'products', route: '/app/products' },
+      { label: 'Siparisler', icon: 'orders', route: '/app/orders' },
       { label: 'Kargolar', icon: 'shipments', route: '/app/shipments' },
       { label: 'Yorumlar', icon: 'reviews', route: '/app/reviews', roles: ['ADMIN', 'CORPORATE'] },
       { label: 'Analitik', icon: 'analytics', route: '/app/analytics', roles: ['ADMIN', 'CORPORATE'] },
       { label: 'AI Asistan', icon: 'chatbot', route: '/app/chatbot' },
-      { label: 'Mağazalar', icon: 'stores', route: '/app/stores', roles: ['ADMIN', 'CORPORATE'] },
-      { label: 'Kullanıcılar', icon: 'users', route: '/app/users', roles: ['ADMIN'] },
+      { label: 'Magazalar', icon: 'stores', route: '/app/stores', roles: ['ADMIN', 'CORPORATE'] },
+      { label: 'Kullanicilar', icon: 'users', route: '/app/users', roles: ['ADMIN'] },
       { label: 'Kategoriler', icon: 'categories', route: '/app/categories', roles: ['ADMIN'] },
+      { label: 'Audit Logs', icon: 'analytics', route: '/app/audit-logs', roles: ['ADMIN'] },
+      { label: 'Sistem Ayarlari', icon: 'stores', route: '/app/system-settings', roles: ['ADMIN'] }
     ];
 
     return all.filter(item => {

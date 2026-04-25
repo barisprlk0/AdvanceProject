@@ -52,6 +52,10 @@ public class ShipmentService {
         return shipmentRepository.findByOrderStoreOwnerId(ownerId);
     }
 
+    public List<Shipment> getShipmentsByOrderId(Integer orderId) {
+        return shipmentRepository.findByOrderId(orderId);
+    }
+
     public Shipment patchShipment(Integer id, Shipment partialShipment) {
         return shipmentRepository.findById(id).map(shipment -> {
             if (partialShipment.getWarehouse() != null) shipment.setWarehouse(partialShipment.getWarehouse());

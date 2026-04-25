@@ -5,6 +5,7 @@ import com.advanceproject.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -74,5 +75,21 @@ public class UserService {
 
     public void deleteUser(Integer id) {
         userRepository.deleteById(id);
+    }
+
+    public void changePassword(Integer userId, String currentPassword, String newPassword, PasswordEncoder passwordEncoder) {
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            throw new RuntimeException("Yeni sifre en az 6 karakter olmalidir.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new RuntimeException("Mevcut sifre hatali.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword.trim()));
+        userRepository.save(user);
     }
 }

@@ -1,19 +1,29 @@
 <div class="analytics-page fade-in">
   <div class="page-header">
     <div>
-      <h1 class="page-title">Admin Analitik</h1>
-      <p class="page-subtitle">Platform geneli gelir, kullanıcı, mağaza ve memnuniyet analizi</p>
+      <h1 class="page-title">@if (isCorporate()) { Kurumsal Analitik } @else { Admin Analitik }</h1>
+      <p class="page-subtitle">
+        @if (isCorporate()) { Magaza bazli gelir, musteri segmenti ve kategori performansi }
+        @else { Platform geneli gelir, kullanici, magaza ve memnuniyet analizi }
+      </p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm" routerLink="/app/users">Kullanıcılar</button>
-      <button class="btn btn-primary btn-sm" routerLink="/app/stores">Mağazalar</button>
+      @if (isCorporate()) {
+        <input class="form-input" type="date" [value]="fromDate()" (change)="fromDate.set($any($event.target).value)" style="width:160px">
+        <input class="form-input" type="date" [value]="toDate()" (change)="toDate.set($any($event.target).value)" style="width:160px">
+        <button class="btn btn-secondary btn-sm" (click)="applyDateRange()">Filtrele</button>
+        <button class="btn btn-secondary btn-sm" (click)="resetDateRange()">Sifirla</button>
+      } @else {
+        <button class="btn btn-secondary btn-sm" routerLink="/app/users">Kullanicilar</button>
+        <button class="btn btn-primary btn-sm" routerLink="/app/stores">Magazalar</button>
+      }
     </div>
   </div>
 
   @if (loading()) {
     <div class="card analytics-loading">
       <span class="spinner"></span>
-      <p>Analiz verileri yükleniyor...</p>
+      <p>Analiz verileri yukleniyor...</p>
     </div>
   } @else {
     <div class="kpi-grid">
@@ -26,16 +36,12 @@
       }
     </div>
 
-    <div class="data-scope">
-      Analiz kapsamı: backend sayfaları 2000 kayıtlık parçalar halinde tamamen okunur; KPI ve grafikler yüklenen gerçek kayıtlarla hesaplanır.
-    </div>
-
     <div class="charts-grid">
       <section class="card chart-card-wide">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Aylık Gelir Performansı</h3>
-            <p class="card-subtitle">Toplam gelir ve teslim edilen sipariş geliri</p>
+            <h3 class="card-title">Aylik Gelir Performansi</h3>
+            <p class="card-subtitle">Toplam gelir ve teslim edilen siparis geliri</p>
           </div>
         </div>
         <div class="chart-wrapper-lg"><canvas #revenueChart></canvas></div>
@@ -44,8 +50,8 @@
       <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Sipariş Durumları</h3>
-            <p class="card-subtitle">Kargo durumu öncelikli</p>
+            <h3 class="card-title">Siparis Durumlari</h3>
+            <p class="card-subtitle">Kargo durumu oncelikli</p>
           </div>
         </div>
         <div class="chart-wrapper-sm"><canvas #statusChart></canvas></div>
@@ -54,8 +60,8 @@
       <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Kullanıcı Rolleri</h3>
-            <p class="card-subtitle">Admin, kurumsal ve müşteri dağılımı</p>
+            <h3 class="card-title">Kullanici Rolleri</h3>
+            <p class="card-subtitle">Admin, kurumsal ve musteri dagilimi</p>
           </div>
         </div>
         <div class="chart-wrapper-sm"><canvas #roleChart></canvas></div>
@@ -64,8 +70,8 @@
       <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Puan Dağılımı</h3>
-            <p class="card-subtitle">Ürün yorum yıldızları</p>
+            <h3 class="card-title">Puan Dagilimi</h3>
+            <p class="card-subtitle">Urun yorum yildizlari</p>
           </div>
         </div>
         <div class="chart-wrapper-sm"><canvas #ratingChart></canvas></div>
@@ -76,17 +82,17 @@
       <section class="card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Mağaza Performansı</h3>
-            <p class="card-subtitle">Gelire göre ilk mağazalar</p>
+            <h3 class="card-title">Magaza Performansi</h3>
+            <p class="card-subtitle">Gelire gore ilk magazalar</p>
           </div>
         </div>
         <table class="data-table compact-table">
           <thead>
             <tr>
-              <th>Mağaza</th>
+              <th>Magaza</th>
               <th>Sahip</th>
-              <th>Ürün</th>
-              <th>Sipariş</th>
+              <th>Urun</th>
+              <th>Siparis</th>
               <th>Gelir</th>
             </tr>
           </thead>
@@ -100,7 +106,7 @@
                 <td class="font-medium">{{ store.revenue }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="5" class="empty-cell">Mağaza verisi yok.</td></tr>
+              <tr><td colspan="5" class="empty-cell">Magaza verisi yok.</td></tr>
             }
           </tbody>
         </table>
@@ -109,16 +115,16 @@
       <section class="card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Kategori Performansı</h3>
-            <p class="card-subtitle">Ürün, satış ve gelir kırılımı</p>
+            <h3 class="card-title">Kategori Performansi</h3>
+            <p class="card-subtitle">Urun, satis ve gelir kirilimi</p>
           </div>
         </div>
         <table class="data-table compact-table">
           <thead>
             <tr>
               <th>Kategori</th>
-              <th>Ürün</th>
-              <th>Satış</th>
+              <th>Urun</th>
+              <th>Satis</th>
               <th>Gelir</th>
             </tr>
           </thead>
@@ -140,31 +146,18 @@
 
     <div class="bottom-grid">
       <section class="card">
-        <h3 class="card-title">Durum Özeti</h3>
-        <div class="status-list">
-          @for (row of orderStatusRows(); track row.label) {
-            <div class="status-row">
-              <span class="badge" [class]="'badge-' + row.className">{{ row.label }}</span>
-              <div class="status-track"><div [style.width]="row.percent + '%'"></div></div>
-              <strong>{{ row.count }}</strong>
-            </div>
-          }
-        </div>
-      </section>
-
-      <section class="card">
         <h3 class="card-title">Son Yorumlar</h3>
         <div class="review-list">
           @for (review of recentReviews(); track review.id) {
             <article class="review-item">
               <div>
                 <strong>{{ productName(review) }}</strong>
-                <span>{{ userName(review) }} · {{ stars(reviewRating(review)) }}</span>
+                <span>{{ userName(review) }} - {{ stars(reviewRating(review)) }}</span>
               </div>
               <p>{{ review.sentiment || 'Yorum metni yok.' }}</p>
             </article>
           } @empty {
-            <div class="empty-cell">Yorum bulunamadı.</div>
+            <div class="empty-cell">Yorum bulunamadi.</div>
           }
         </div>
       </section>

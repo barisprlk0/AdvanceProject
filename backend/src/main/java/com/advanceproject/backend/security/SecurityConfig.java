@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/profile").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/users/profile").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/users/profile").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/users/profile/change-password").authenticated()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         
                         // Category restrictions
@@ -76,7 +77,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/orders/**").hasAnyRole("ADMIN", "CORPORATE")
                         .requestMatchers(HttpMethod.PUT, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
                         .requestMatchers(HttpMethod.PATCH, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
+                        .requestMatchers(HttpMethod.POST, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
                         .requestMatchers(HttpMethod.DELETE, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
+
+                        // Customer profile restrictions
+                        .requestMatchers(HttpMethod.GET, "/api/customer-profiles/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/customer-profiles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/customer-profiles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/customer-profiles/**").hasRole("ADMIN")
+
+                        // Admin operations
+                        .requestMatchers("/api/audit-logs/**").hasRole("ADMIN")
+                        .requestMatchers("/api/system-settings/**").hasRole("ADMIN")
                         
                         .anyRequest().authenticated()
                 )

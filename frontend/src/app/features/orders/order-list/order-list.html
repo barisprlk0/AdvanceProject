@@ -5,7 +5,7 @@
       <p class="page-subtitle">Sipariş yönetimi ve takibi</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm">
+      <button class="btn btn-secondary btn-sm" (click)="exportOrders()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Dışa Aktar
       </button>
@@ -66,8 +66,8 @@
                   <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
                   <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
                 </select>
-              } @else if (auth.hasRole('CORPORATE') && !isFinalStatus(order.rawStatus) && order.rawStatus !== 'Shipped') {
-                <button class="btn btn-primary btn-sm" (click)="shipOrder(order, $event)">
+              } @else if (canShip(order)) {
+                <button class="btn btn-primary btn-sm" [disabled]="isShipping(order.id)" (click)="shipOrder(order, $event)">
                   Kargoya Ver
                 </button>
               } @else {

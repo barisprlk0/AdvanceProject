@@ -1,12 +1,16 @@
 package com.advanceproject.backend.service;
 
 import com.advanceproject.backend.entity.Review;
+import com.advanceproject.backend.entity.User;
+import com.advanceproject.backend.entity.AuditLog;
+import com.advanceproject.backend.repository.AuditLogRepository;
 import com.advanceproject.backend.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,10 +18,12 @@ import java.util.Optional;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final AuditLogRepository auditLogRepository;
 
     @Autowired
-    public ReviewService(ReviewRepository reviewRepository) {
+    public ReviewService(ReviewRepository reviewRepository, AuditLogRepository auditLogRepository) {
         this.reviewRepository = reviewRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     public Review createReview(Review review) {
@@ -78,10 +84,28 @@ public class ReviewService {
         }).orElseThrow(() -> new RuntimeException("Review not found"));
     }
 
-    public Review voteHelpful(Integer id) {
+    public Review voteHelpful(Integer id, User voter) {
+        String action = "REVIEW_HELPFUL_VOTE";
+        String details = "reviewId=" + id;
+
+        boolean alreadyVoted = auditLogRepository.existsByUser_IdAndActionAndDetails(voter.getId(), action, details);
+        if (alreadyVoted) {
+            throw new IllegalStateException("Bu yorumu daha once faydali buldunuz.");
+        }
+
         return reviewRepository.findById(id).map(review -> {
             review.setHelpfulnessVotes((review.getHelpfulnessVotes() != null ? review.getHelpfulnessVotes() : 0) + 1);
-            return reviewRepository.save(review);
+
+            Review updated = reviewRepository.save(review);
+
+            AuditLog log = new AuditLog();
+            log.setUser(voter);
+            log.setAction(action);
+            log.setDetails(details);
+            log.setTimestamp(LocalDateTime.now());
+            auditLogRepository.save(log);
+
+            return updated;
         }).orElseThrow(() -> new RuntimeException("Review not found"));
     }
 

@@ -2,6 +2,7 @@ package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.dto.AuthResponse;
 import com.advanceproject.backend.dto.LoginRequest;
+import com.advanceproject.backend.dto.RefreshTokenRequest;
 import com.advanceproject.backend.dto.RegisterRequest;
 import com.advanceproject.backend.entity.User;
 import com.advanceproject.backend.security.JwtUtil;
@@ -49,13 +50,15 @@ public class AuthController {
         );
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-        final String jwt = jwtUtil.generateToken(userDetails);
+        final String jwt = jwtUtil.generateAccessToken(userDetails);
+        final String refreshToken = jwtUtil.generateRefreshToken(userDetails);
         
         User user = userService.getUserByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found after authentication"));
 
         return ResponseEntity.ok(new AuthResponse(
                 jwt, 
+                refreshToken,
                 user.getEmail(), 
                 user.getId(), 
                 user.getRoleType(), 
@@ -81,14 +84,48 @@ public class AuthController {
         User savedUser = userService.registerUser(newUser);
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(savedUser.getEmail());
-        final String jwt = jwtUtil.generateToken(userDetails);
+        final String jwt = jwtUtil.generateAccessToken(userDetails);
+        final String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
         return ResponseEntity.ok(new AuthResponse(
                 jwt, 
+                refreshToken,
                 savedUser.getEmail(), 
                 savedUser.getId(), 
                 savedUser.getRoleType(), 
                 savedUser.getGender()
+        ));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new RuntimeException("Refresh token is required.");
+        }
+
+        String email = jwtUtil.extractUsername(refreshToken);
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+        if (!userDetails.isEnabled()) {
+            throw new RuntimeException("User account is suspended.");
+        }
+        if (!jwtUtil.validateRefreshToken(refreshToken, userDetails.getUsername())) {
+            throw new RuntimeException("Refresh token is invalid or expired.");
+        }
+
+        User user = userService.getUserByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        final String newAccessToken = jwtUtil.generateAccessToken(userDetails);
+        final String newRefreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+        return ResponseEntity.ok(new AuthResponse(
+                newAccessToken,
+                newRefreshToken,
+                user.getEmail(),
+                user.getId(),
+                user.getRoleType(),
+                user.getGender()
         ));
     }
 }

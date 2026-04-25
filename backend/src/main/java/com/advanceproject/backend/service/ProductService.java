@@ -65,6 +65,9 @@ public class ProductService {
             if (partialProduct.getSku() != null) product.setSku(partialProduct.getSku());
             if (partialProduct.getDescription() != null) product.setDescription(partialProduct.getDescription());
             if (partialProduct.getUnitPrice() != null) product.setUnitPrice(partialProduct.getUnitPrice());
+            if (partialProduct.getStockQuantity() != null) product.setStockQuantity(partialProduct.getStockQuantity());
+            if (partialProduct.getCurrencyCode() != null) product.setCurrencyCode(partialProduct.getCurrencyCode());
+            if (partialProduct.getExchangeRate() != null) product.setExchangeRate(partialProduct.getExchangeRate());
             if (partialProduct.getCategory() != null) product.setCategory(partialProduct.getCategory());
             if (partialProduct.getStore() != null) product.setStore(partialProduct.getStore());
             return productRepository.save(product);
@@ -77,6 +80,9 @@ public class ProductService {
             product.setSku(updatedProduct.getSku());
             product.setDescription(updatedProduct.getDescription());
             product.setUnitPrice(updatedProduct.getUnitPrice());
+            product.setStockQuantity(updatedProduct.getStockQuantity());
+            product.setCurrencyCode(updatedProduct.getCurrencyCode());
+            product.setExchangeRate(updatedProduct.getExchangeRate());
             product.setCategory(updatedProduct.getCategory());
             product.setStore(updatedProduct.getStore());
             return productRepository.save(product);

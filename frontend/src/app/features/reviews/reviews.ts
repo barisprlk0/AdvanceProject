@@ -3,6 +3,7 @@ import { ApiService } from '../../core/services/api.service';
 import { Review } from '../../core/models';
 import { ToastService } from '../../core/services/toast.service';
 import { PaginationComponent } from '../../shared/components/pagination/pagination';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-reviews',
@@ -74,7 +75,9 @@ import { PaginationComponent } from '../../shared/components/pagination/paginati
                   </td>
                   <td class="text-muted">{{ review.helpfulnessVotes || 0 }}</td>
                   <td>
-                    <button class="btn-icon-sm text-danger" (click)="deleteReview(review.id)">🗑</button>
+                    @if (canDeleteReviews()) {
+                      <button class="btn-icon-sm text-danger" (click)="deleteReview(review.id)">🗑</button>
+                    }
                   </td>
                 </tr>
               }
@@ -122,10 +125,12 @@ export class ReviewsComponent implements OnInit {
   pageSize = signal(30);
   totalElements = signal(0);
   totalPages = signal(0);
+  canDeleteReviews = signal(false);
 
-  constructor(private api: ApiService, private toast: ToastService) {}
+  constructor(private api: ApiService, private toast: ToastService, private auth: AuthService) {}
 
   ngOnInit(): void {
+    this.canDeleteReviews.set(this.auth.userRole() === 'ADMIN');
     this.fetchReviews();
   }
 

@@ -61,6 +61,18 @@ export class ApiService {
     return this.http.get<T>(`${this.baseUrl}/${endpoint}`);
   }
 
+  getEndpoint<T>(endpoint: string, params?: Record<string, string | number | boolean>): Observable<T> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          httpParams = httpParams.set(key, value.toString());
+        }
+      });
+    }
+    return this.http.get<T>(`${this.baseUrl}/${endpoint}`, { params: httpParams });
+  }
+
   create<T>(endpoint: string, body: unknown): Observable<T> {
     return this.http.post<T>(`${this.baseUrl}/${endpoint}`, body);
   }
@@ -75,6 +87,10 @@ export class ApiService {
 
   patchEndpoint<T>(endpoint: string, body: unknown): Observable<T> {
     return this.http.patch<T>(`${this.baseUrl}/${endpoint}`, body);
+  }
+
+  postEndpoint<T>(endpoint: string, body: unknown): Observable<T> {
+    return this.http.post<T>(`${this.baseUrl}/${endpoint}`, body);
   }
 
   delete(endpoint: string, id: number | string): Observable<void> {

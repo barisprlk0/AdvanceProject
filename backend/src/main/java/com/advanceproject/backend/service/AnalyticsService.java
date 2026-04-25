@@ -3,6 +3,8 @@ package com.advanceproject.backend.service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,7 @@ public class AnalyticsService {
                         ORDER BY month
                         """));
 
-        result.put("statusDistribution", jdbcTemplate.queryForList(
+        result.put("statusDistribution", safeQueryForList(
                 """
                         SELECT
                             CASE
@@ -78,14 +80,14 @@ public class AnalyticsService {
                         ORDER BY count DESC
                         """));
 
-        result.put("roleDistribution", jdbcTemplate.queryForList("""
+        result.put("roleDistribution", safeQueryForList("""
                 SELECT role_type AS role, COUNT(*) AS count
                 FROM users
                 GROUP BY role_type
                 ORDER BY count DESC
                 """));
 
-        result.put("ratingDistribution", jdbcTemplate.queryForList("""
+        result.put("ratingDistribution", safeQueryForList("""
                 SELECT star_rating AS rating, COUNT(*) AS count
                 FROM reviews
                 WHERE star_rating IS NOT NULL
@@ -149,8 +151,9 @@ public class AnalyticsService {
         return result;
     }
 
-    public Map<String, Object> getCorporateAnalytics(Integer ownerId) {
+    public Map<String, Object> getCorporateAnalytics(Integer ownerId, LocalDate fromDate, LocalDate toDate) {
         Map<String, Object> result = new LinkedHashMap<>();
+        Object[] ownerAndDateArgs = ownerAndDateArgs(ownerId, fromDate, toDate);
 
         result.put("summary", safeQueryForMap("""
                 SELECT
@@ -159,7 +162,9 @@ public class AnalyticsService {
                 FROM orders o
                 JOIN stores s ON s.id = o.store_id
                 WHERE s.owner_id = ?
-                """, ownerId));
+                  AND (? IS NULL OR DATE(o.order_date) >= ?)
+                  AND (? IS NULL OR DATE(o.order_date) <= ?)
+                """, ownerAndDateArgs));
 
         result.put("products", safeQueryForMap("""
                 SELECT
@@ -174,18 +179,80 @@ public class AnalyticsService {
                 SELECT
                     o.id,
                     o.order_date,
-                    o.status,
+                    COALESCE(sh.status, o.status) AS status,
                     o.grand_total,
                     u.email AS customer_email
                 FROM orders o
                 JOIN stores s ON s.id = o.store_id
+                LEFT JOIN LATERAL (
+                    SELECT s2.status
+                    FROM shipments s2
+                    WHERE s2.order_id = o.id
+                    ORDER BY s2.id DESC
+                    LIMIT 1
+                ) sh ON true
                 JOIN users u ON u.id = o.user_id
                 WHERE s.owner_id = ?
+                  AND (? IS NULL OR DATE(o.order_date) >= ?)
+                  AND (? IS NULL OR DATE(o.order_date) <= ?)
                 ORDER BY o.order_date DESC
                 LIMIT 5
-                """, ownerId));
+                """, ownerAndDateArgs));
+
+        result.put("monthlyRevenue", safeQueryForList("""
+                SELECT
+                    EXTRACT(MONTH FROM o.order_date) AS month,
+                    COALESCE(SUM(o.grand_total), 0) AS revenue
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id
+                WHERE s.owner_id = ?
+                  AND o.order_date IS NOT NULL
+                  AND (? IS NULL OR DATE(o.order_date) >= ?)
+                  AND (? IS NULL OR DATE(o.order_date) <= ?)
+                GROUP BY EXTRACT(MONTH FROM o.order_date)
+                ORDER BY month
+                """, ownerAndDateArgs));
+
+        result.put("customerSegments", safeQueryForList("""
+                SELECT
+                    COALESCE(cp.membership_type, 'Standard') AS segment,
+                    COUNT(DISTINCT o.user_id) AS customer_count,
+                    COALESCE(SUM(o.grand_total), 0) AS revenue
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id
+                LEFT JOIN customer_profiles cp ON cp.user_id = o.user_id
+                WHERE s.owner_id = ?
+                  AND (? IS NULL OR DATE(o.order_date) >= ?)
+                  AND (? IS NULL OR DATE(o.order_date) <= ?)
+                GROUP BY COALESCE(cp.membership_type, 'Standard')
+                ORDER BY revenue DESC
+                """, ownerAndDateArgs));
+
+        result.put("revenueByCategory", safeQueryForList("""
+                SELECT
+                    COALESCE(c.name, 'Diger') AS name,
+                    COALESCE(SUM(oi.quantity), 0) AS sold_count,
+                    COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p ON p.id = oi.product_id
+                LEFT JOIN categories c ON c.id = p.category_id
+                WHERE s.owner_id = ?
+                  AND (? IS NULL OR DATE(o.order_date) >= ?)
+                  AND (? IS NULL OR DATE(o.order_date) <= ?)
+                GROUP BY COALESCE(c.name, 'Diger')
+                ORDER BY revenue DESC
+                LIMIT 8
+                """, ownerAndDateArgs));
 
         return result;
+    }
+
+    private Object[] ownerAndDateArgs(Integer ownerId, LocalDate fromDate, LocalDate toDate) {
+        Date fromSql = fromDate != null ? Date.valueOf(fromDate) : null;
+        Date toSql = toDate != null ? Date.valueOf(toDate) : null;
+        return new Object[]{ownerId, fromSql, fromSql, toSql, toSql};
     }
 
     public Map<String, Object> getIndividualAnalytics(Integer userId) {

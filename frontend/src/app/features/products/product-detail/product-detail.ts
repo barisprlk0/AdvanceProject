@@ -118,7 +118,7 @@ import { ToastService } from '../../../core/services/toast.service';
                     </div>
                     <p>{{ review.sentiment || 'Yorum metni yok.' }}</p>
                     <div class="review-footer">
-                      <button class="btn-helpful" (click)="voteReview(review)" [disabled]="loading()">
+                      <button class="btn-helpful" (click)="voteReview(review)" [disabled]="loading() || isVoting(review.id)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
                         Faydalı Buldum ({{ review.helpfulnessVotes || 0 }})
                       </button>
@@ -223,6 +223,7 @@ export class ProductDetailComponent implements OnInit {
   loading = signal(true);
   reviewsLoading = signal(false);
   reviewSubmitting = signal(false);
+  votingReviewIds = signal<number[]>([]);
   quantity = signal(1);
   selectedRating = signal(5);
   reviewText = '';
@@ -332,18 +333,45 @@ export class ProductDetailComponent implements OnInit {
   }
 
   voteReview(review: Review): void {
+    if (!review?.id) {
+      this.toast.error('Yorum kimliği bulunamadı.');
+      return;
+    }
+
     if (!this.auth.isAuthenticated()) {
       this.toast.error('Oy vermek için giriş yapmalısınız.');
       this.router.navigate(['/login']);
       return;
     }
 
+    this.setVoting(review.id, true);
     this.api.create<Review>(`reviews/${review.id}/vote`, {}).subscribe({
       next: (updated) => {
         this.reviews.update(list => list.map(r => r.id === updated.id ? updated : r));
         this.toast.success('Geri bildiriminiz kaydedildi.');
+        this.setVoting(review.id, false);
       },
-      error: () => this.toast.error('İşlem başarısız oldu.')
+      error: (err) => {
+        const message = err?.error?.error || err?.error?.message || err?.message || 'İşlem başarısız oldu.';
+        this.toast.error(message);
+        this.setVoting(review.id, false);
+      }
+    });
+  }
+
+  isVoting(reviewId: number | null | undefined): boolean {
+    if (!reviewId) return false;
+    return this.votingReviewIds().includes(reviewId);
+  }
+
+  private setVoting(reviewId: number, voting: boolean): void {
+    if (!reviewId) return;
+
+    this.votingReviewIds.update((ids) => {
+      if (voting) {
+        return ids.includes(reviewId) ? ids : [...ids, reviewId];
+      }
+      return ids.filter((id) => id !== reviewId);
     });
   }
 }
