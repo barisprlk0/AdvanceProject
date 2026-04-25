@@ -27,9 +27,14 @@ import { Product, Category, Store } from '../../../core/models';
                 <input class="form-input" name="price" type="number" [(ngModel)]="formData.unitPrice" required>
               </div>
               <div class="form-group">
-                <label class="form-label">SKU</label>
-                <input class="form-input" name="sku" [(ngModel)]="formData.sku" required placeholder="Örn: WATCH-001">
+                <label class="form-label">Stok Adedi</label>
+                <input class="form-input" name="stock" type="number" [(ngModel)]="formData.stockQuantity" required min="0">
               </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">SKU</label>
+              <input class="form-input" name="sku" [(ngModel)]="formData.sku" required placeholder="Örn: WATCH-001">
             </div>
 
             <div class="form-group">

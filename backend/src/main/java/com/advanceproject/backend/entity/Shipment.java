@@ -36,4 +36,10 @@ public class Shipment {
 
     @Column(name = "status", length = 50)
     private String status;
+
+    @Column(name = "customer_rating")
+    private Integer customerRating;
+
+    @Column(name = "product_importance", length = 20)
+    private String productImportance;
 }

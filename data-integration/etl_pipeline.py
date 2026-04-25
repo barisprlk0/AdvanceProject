@@ -119,7 +119,7 @@ class ETLPipeline:
         with self.engine.connect() as conn:
             trans = conn.begin()
             try:
-                drop_sql = "DROP TABLE IF EXISTS reviews, shipments, order_items, orders, products, categories, customer_profiles, stores, users CASCADE;"
+                drop_sql = "DROP TABLE IF EXISTS audit_logs, reviews, shipments, order_items, orders, products, categories, customer_profiles, stores, users CASCADE;"
                 conn.execute(text(drop_sql))
                 conn.execute(text(self.sql_schema))
                 trans.commit()
@@ -262,10 +262,24 @@ class ETLPipeline:
         products_master['store_id'] = np.random.choice(store_ids_pool, len(products_master))
         products_master['category_id'] = products_master.get('cat_name', pd.Series()).map(cat_map).fillna(1).astype(int)
         
-        products_final = products_master[['store_id', 'category_id', 'sku', 'name', 'description', 'price']].rename(columns={'price': 'unit_price'}).copy()
+        # Add currency metadata placeholders (logic can be expanded based on ds source)
+        products_master['currency_code'] = 'USD'
+        products_master['exchange_rate'] = 1.0
+        # For DS1 (GBP) and DS5 (PKR), we already normalized, but let's record it
+        # Note: products_master might have mixed sources, so this is a simplification
+        
+        products_master = products_master.rename(columns={'price': 'unit_price'})
+        
+        products_final = products_master[['store_id', 'category_id', 'sku', 'name', 'description', 'unit_price', 'currency_code', 'exchange_rate']].copy()
         products_final['name'] = products_final['name'].fillna('Product from Source')
         products_final['description'] = products_final['description'].fillna('')
         products_final['unit_price'] = pd.to_numeric(products_final['unit_price'], errors='coerce').fillna(0.0)
+        # Fix zero prices with random values
+        zero_price_mask = products_final['unit_price'] <= 0
+        if zero_price_mask.any():
+            products_final.loc[zero_price_mask, 'unit_price'] = np.random.uniform(10, 500, size=zero_price_mask.sum()).round(2)
+        
+        products_final['stock_quantity'] = np.random.randint(0, 201, size=len(products_final))
         
         products_final.to_sql('products', self.engine, if_exists='append', index=False)
         product_id_map = dict(zip(products_final['sku'], range(1, len(products_final)+1)))
@@ -359,7 +373,9 @@ class ETLPipeline:
                 'order_id': list(range(1, n_orders+1)),
                 'warehouse': ship_tiled['Warehouse_block'],
                 'mode': ship_tiled['Mode_of_Shipment'],
-                'status': 'Delivered'
+                'status': 'Delivered',
+                'customer_rating': pd.to_numeric(ship_tiled['Customer_rating'], errors='coerce').fillna(5).astype(int),
+                'product_importance': ship_tiled['Product_importance'].fillna('low')
             })
             shipments_final.to_sql('shipments', self.engine, if_exists='append', index=False)
 
@@ -389,14 +405,15 @@ if __name__ == "__main__":
     CREATE TABLE stores (id SERIAL PRIMARY KEY, owner_id INT, name VARCHAR(100), status VARCHAR(20), FOREIGN KEY (owner_id) REFERENCES users(id));
     CREATE TABLE customer_profiles (id SERIAL PRIMARY KEY, user_id INT UNIQUE, age INT, city VARCHAR(100), membership_type VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id));
     CREATE TABLE categories (id SERIAL PRIMARY KEY, name VARCHAR(100), parent_id INT, FOREIGN KEY (parent_id) REFERENCES categories(id));
-    CREATE TABLE products (id SERIAL PRIMARY KEY, store_id INT, category_id INT, sku VARCHAR(100), name VARCHAR(255), description TEXT, unit_price DECIMAL(10,2), FOREIGN KEY (store_id) REFERENCES stores(id), FOREIGN KEY (category_id) REFERENCES categories(id));
+    CREATE TABLE products (id SERIAL PRIMARY KEY, store_id INT, category_id INT, sku VARCHAR(100), name VARCHAR(255), description TEXT, unit_price DECIMAL(10,2), stock_quantity INT DEFAULT 100, currency_code VARCHAR(3) DEFAULT 'USD', exchange_rate DECIMAL(10,4) DEFAULT 1.0, FOREIGN KEY (store_id) REFERENCES stores(id), FOREIGN KEY (category_id) REFERENCES categories(id));
     CREATE TABLE orders (id SERIAL PRIMARY KEY, user_id INT, store_id INT, status VARCHAR(50), order_date TIMESTAMP, payment_method VARCHAR(50), grand_total DECIMAL(10,2), FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (store_id) REFERENCES stores(id));
     CREATE TABLE order_items (id SERIAL PRIMARY KEY, order_id INT, product_id INT, quantity INT, price DECIMAL(10,2), FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id));
-    CREATE TABLE shipments (id SERIAL PRIMARY KEY, order_id INT, warehouse VARCHAR(50), mode VARCHAR(50), status VARCHAR(50), FOREIGN KEY (order_id) REFERENCES orders(id));
+    CREATE TABLE shipments (id SERIAL PRIMARY KEY, order_id INT, warehouse VARCHAR(50), mode VARCHAR(50), status VARCHAR(50), customer_rating INT, product_importance VARCHAR(20), FOREIGN KEY (order_id) REFERENCES orders(id));
     CREATE TABLE reviews (id SERIAL PRIMARY KEY, user_id INT, product_id INT, star_rating INT, helpfulness_votes INT, sentiment VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (product_id) REFERENCES products(id));
+    CREATE TABLE audit_logs (id SERIAL PRIMARY KEY, user_id INT, action VARCHAR(100), details TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id));
     """
     DB_URL = "postgresql://postgres:604730@localhost:5432/e_commerce"
-    raw_data_dir = os.path.dirname(os.path.abspath(__file__))
+    raw_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datasets')
     pipeline = ETLPipeline(DB_URL, raw_data_dir, USER_SQL)
     pipeline.ensure_database_exists()
     pipeline.apply_sql_schema()

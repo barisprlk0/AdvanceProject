@@ -78,6 +78,13 @@ public class ReviewService {
         }).orElseThrow(() -> new RuntimeException("Review not found"));
     }
 
+    public Review voteHelpful(Integer id) {
+        return reviewRepository.findById(id).map(review -> {
+            review.setHelpfulnessVotes((review.getHelpfulnessVotes() != null ? review.getHelpfulnessVotes() : 0) + 1);
+            return reviewRepository.save(review);
+        }).orElseThrow(() -> new RuntimeException("Review not found"));
+    }
+
     public void deleteReview(Integer id) {
         reviewRepository.deleteById(id);
     }

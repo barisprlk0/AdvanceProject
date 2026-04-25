@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { CartService } from '../../../core/services/cart.service';
 import { Product, Review } from '../../../core/models';
 import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-product-detail',
+  standalone: true,
   imports: [RouterLink, CurrencyPipe, FormsModule],
   template: `
     <div class="fade-in">
@@ -40,20 +42,31 @@ import { ToastService } from '../../../core/services/toast.service';
               <span class="badge badge-secondary" style="margin-bottom:12px">{{ product()?.category?.name || 'Kategori yok' }}</span>
               <h2 class="product-title">{{ product()?.name }}</h2>
               <p class="product-sku">SKU: {{ product()?.sku }}</p>
-              <div class="product-price-box">
-                <span class="price-label">Birim Fiyat</span>
-                <span class="price-value">{{ product()?.unitPrice | currency:'TRY':'symbol':'1.2-2':'tr-TR' }}</span>
+              
+              <div class="product-meta-row">
+                <div class="product-price-box">
+                  <span class="price-label">Birim Fiyat</span>
+                  <span class="price-value">{{ product()?.unitPrice | currency:'TRY':'symbol':'1.2-2':'tr-TR' }}</span>
+                </div>
+                
+                @if (product()?.stockQuantity != null) {
+                  <div class="stock-badge" [class.low-stock]="(product()?.stockQuantity || 0) < 10">
+                    {{ product()?.stockQuantity }} adet stokta
+                  </div>
+                }
               </div>
+
               <p class="product-desc">{{ product()?.description || 'Açıklama bulunmuyor.' }}</p>
 
               @if (isIndividual()) {
-                <div class="product-actions">
-                  <button class="btn btn-primary btn-lg order-button" (click)="placeOrder()" [disabled]="orderLoading()">
-                    @if (orderLoading()) {
-                      <span class="spinner spinner-sm"></span> İşleniyor...
-                    } @else {
-                      Hemen Sipariş Ver
-                    }
+                <div class="product-actions-area">
+                  <div class="quantity-selector">
+                    <button (click)="changeQty(-1)" [disabled]="quantity() <= 1">-</button>
+                    <input type="number" [value]="quantity()" readonly>
+                    <button (click)="changeQty(1)" [disabled]="quantity() >= (product()?.stockQuantity || 0)">+</button>
+                  </div>
+                  <button class="btn btn-primary btn-lg cart-button" (click)="addToCart()" [disabled]="(product()?.stockQuantity || 0) <= 0">
+                    {{ (product()?.stockQuantity || 0) <= 0 ? 'Stokta Yok' : 'Sepete Ekle' }}
                   </button>
                 </div>
               }
@@ -102,9 +115,14 @@ import { ToastService } from '../../../core/services/toast.service';
                         <strong>{{ getUserName(review) }}</strong>
                         <span>{{ starText(review.starRating) }}</span>
                       </div>
-                      <span class="helpful">{{ review.helpfulnessVotes || 0 }} faydalı oy</span>
                     </div>
                     <p>{{ review.sentiment || 'Yorum metni yok.' }}</p>
+                    <div class="review-footer">
+                      <button class="btn-helpful" (click)="voteReview(review)" [disabled]="loading()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                        Faydalı Buldum ({{ review.helpfulnessVotes || 0 }})
+                      </button>
+                    </div>
                   </article>
                 } @empty {
                   <div class="empty-reviews">Henüz yorum yok.</div>
@@ -128,7 +146,7 @@ import { ToastService } from '../../../core/services/toast.service';
                 name="reviewText"
                 [(ngModel)]="reviewText"
                 rows="5"
-                maxlength="50"
+                maxlength="100"
                 placeholder="Ürün hakkındaki deneyiminizi yazın"></textarea>
               <button class="btn btn-primary submit-review" (click)="submitReview()" [disabled]="reviewSubmitting() || !canSubmitReview()">
                 @if (reviewSubmitting()) {
@@ -152,12 +170,20 @@ import { ToastService } from '../../../core/services/toast.service';
     .product-main-details { flex: 1; min-width: 0; }
     .product-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
     .product-sku { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 24px; }
-    .product-price-box { background: var(--bg-surface); border: 1px solid var(--border-color); padding: 16px 20px; border-radius: var(--radius-md); display: inline-flex; flex-direction: column; gap: 4px; margin-bottom: 24px; }
+    .product-meta-row { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; }
+    .product-price-box { background: var(--bg-surface); border: 1px solid var(--border-color); padding: 12px 20px; border-radius: var(--radius-md); display: inline-flex; flex-direction: column; gap: 4px; }
     .price-label { font-size: 0.75rem; color: var(--text-muted); }
     .price-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+    .stock-badge { font-size: 0.875rem; color: #10b981; font-weight: 600; padding: 6px 12px; background: #ecfdf5; border-radius: 20px; }
+    .stock-badge.low-stock { color: #f59e0b; background: #fffbeb; }
     .product-desc { line-height: 1.6; color: var(--text-secondary); font-size: 0.9375rem; }
-    .product-actions { margin-top: 32px; }
-    .order-button { width: 100%; height: 54px; font-size: 1.05rem; }
+    .product-actions-area { margin-top: 32px; display: flex; gap: 16px; align-items: center; }
+    .quantity-selector { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; height: 48px; }
+    .quantity-selector button { width: 40px; height: 100%; border: none; background: var(--bg-surface); cursor: pointer; font-size: 1.2rem; transition: background 0.2s; }
+    .quantity-selector button:hover { background: var(--bg-hover); }
+    .quantity-selector input { width: 50px; text-align: center; border: none; font-weight: 600; font-size: 1rem; background: white; -moz-appearance: textfield; }
+    .quantity-selector input::-webkit-outer-spin-button, .quantity-selector input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .cart-button { flex: 1; height: 48px; font-weight: 600; }
     .product-meta-cards { display: flex; flex-direction: column; gap: 20px; }
     .store-info-box { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
     .store-icon { width: 40px; height: 40px; background: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
@@ -173,7 +199,6 @@ import { ToastService } from '../../../core/services/toast.service';
     .review-topline { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     .review-topline strong, .review-topline span { display: block; }
     .review-topline span { color: #f59e0b; font-size: 0.875rem; margin-top: 3px; }
-    .helpful { color: var(--text-muted) !important; font-size: 0.75rem !important; white-space: nowrap; }
     .review-item p { margin: 0; color: var(--text-secondary); line-height: 1.55; }
     .empty-reviews { text-align: center; padding: 34px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: var(--radius-lg); }
     .review-form-card { display: flex; flex-direction: column; gap: 14px; }
@@ -184,6 +209,11 @@ import { ToastService } from '../../../core/services/toast.service';
     .review-textarea { width: 100%; resize: vertical; min-height: 120px; }
     .submit-review { width: 100%; }
     @media (max-width: 992px) { .product-info-card { flex-direction: column; } .product-visual { width: 100%; } .product-detail-grid, .reviews-grid { grid-template-columns: 1fr; } }
+    .review-footer { margin-top: 12px; display: flex; justify-content: flex-end; }
+    .btn-helpful { display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border-color); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8125rem; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+    .btn-helpful:hover { background: var(--bg-surface); color: var(--primary); border-color: var(--primary); }
+    .btn-helpful svg { color: var(--text-muted); }
+    .btn-helpful:hover svg { color: var(--primary); }
   `
 })
 export class ProductDetailComponent implements OnInit {
@@ -192,8 +222,8 @@ export class ProductDetailComponent implements OnInit {
   reviews = signal<Review[]>([]);
   loading = signal(true);
   reviewsLoading = signal(false);
-  orderLoading = signal(false);
   reviewSubmitting = signal(false);
+  quantity = signal(1);
   selectedRating = signal(5);
   reviewText = '';
   Math = Math;
@@ -210,6 +240,7 @@ export class ProductDetailComponent implements OnInit {
     private router: Router,
     private api: ApiService,
     private auth: AuthService,
+    private cart: CartService,
     private toast: ToastService
   ) {}
 
@@ -242,31 +273,22 @@ export class ProductDetailComponent implements OnInit {
     });
   }
 
-  placeOrder(): void {
-    const product = this.product();
-    if (!product) return;
-
-    this.orderLoading.set(true);
-    const orderData = {
-      orderDate: new Date().toISOString(),
-      status: 'Pending',
-      grandTotal: product.unitPrice,
-      user: { id: this.auth.userId() },
-      store: { id: product.store?.id },
-      items: [{ product: { id: product.id }, quantity: 1, price: product.unitPrice }]
-    };
-
-    this.api.create('orders', orderData).subscribe({
-      next: () => {
-        this.orderLoading.set(false);
-        this.toast.success('Siparişiniz başarıyla oluşturuldu!');
-        setTimeout(() => this.router.navigate(['/app/orders']), 1500);
-      },
-      error: () => {
-        this.orderLoading.set(false);
-        this.toast.error('Sipariş oluşturulurken bir hata oluştu.');
-      }
+  changeQty(delta: number): void {
+    const max = this.product()?.stockQuantity ?? 999;
+    this.quantity.update(q => {
+      const next = q + delta;
+      if (next < 1) return 1;
+      if (next > max) return max;
+      return next;
     });
+  }
+
+  addToCart(): void {
+    const p = this.product();
+    if (!p) return;
+    this.cart.addToCart(p, this.quantity());
+    this.toast.success(`${p.name} sepete eklendi!`);
+    this.router.navigate(['/app/cart']);
   }
 
   submitReview(): void {
@@ -307,5 +329,21 @@ export class ProductDetailComponent implements OnInit {
 
   getUserName(review: Review): string {
     return review.user?.email?.split('@')[0] || 'Kullanıcı';
+  }
+
+  voteReview(review: Review): void {
+    if (!this.auth.isAuthenticated()) {
+      this.toast.error('Oy vermek için giriş yapmalısınız.');
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.api.create<Review>(`reviews/${review.id}/vote`, {}).subscribe({
+      next: (updated) => {
+        this.reviews.update(list => list.map(r => r.id === updated.id ? updated : r));
+        this.toast.success('Geri bildiriminiz kaydedildi.');
+      },
+      error: () => this.toast.error('İşlem başarısız oldu.')
+    });
   }
 }

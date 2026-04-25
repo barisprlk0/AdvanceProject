@@ -69,6 +69,9 @@ export interface Product {
   name: string;
   description: string;
   unitPrice: number;
+  stockQuantity?: number;
+  currencyCode?: string;
+  exchangeRate?: number;
 }
 
 // --- Order ---
@@ -99,6 +102,8 @@ export interface Shipment {
   warehouse: string;
   mode: string;
   status: string;
+  customerRating?: number;
+  productImportance?: string;
 }
 
 // --- Review ---

@@ -19,7 +19,7 @@ public class AnalyticsService {
     public Map<String, Object> getAdminAnalytics() {
         Map<String, Object> result = new LinkedHashMap<>();
 
-        result.put("summary", jdbcTemplate.queryForMap("""
+        result.put("summary", safeQueryForMap("""
                 SELECT
                     COUNT(*) AS order_count,
                     COALESCE(SUM(grand_total), 0) AS total_revenue,
@@ -27,52 +27,56 @@ public class AnalyticsService {
                 FROM orders
                 """));
 
-        result.put("completion", jdbcTemplate.queryForMap("""
-                SELECT
-                    COUNT(*) FILTER (WHERE LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%') AS delivered_orders,
-                    COUNT(*) AS total_orders
-                FROM orders o
-                LEFT JOIN shipments s ON s.order_id = o.id
-                """));
+        result.put("completion", safeQueryForMap(
+                """
+                        SELECT
+                            COALESCE(SUM(CASE WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%' THEN 1 ELSE 0 END), 0) AS delivered_orders,
+                            COUNT(*) AS total_orders
+                        FROM orders o
+                        LEFT JOIN shipments s ON s.order_id = o.id
+                        """));
 
-        result.put("platform", jdbcTemplate.queryForMap("""
-                SELECT
-                    (SELECT COUNT(*) FROM users) AS user_count,
-                    (SELECT COUNT(*) FROM stores) AS store_count,
-                    (SELECT COUNT(*) FROM stores WHERE LOWER(COALESCE(status, '')) LIKE '%active%') AS active_store_count,
-                    (SELECT COUNT(*) FROM products) AS product_count,
-                    (SELECT COUNT(DISTINCT category_id) FROM products WHERE category_id IS NOT NULL) AS category_count,
-                    (SELECT COUNT(*) FROM reviews) AS review_count,
-                    (SELECT COALESCE(AVG(star_rating), 0) FROM reviews) AS average_rating
-                """));
+        result.put("platform", safeQueryForMap(
+                """
+                        SELECT
+                            (SELECT COUNT(*) FROM users) AS user_count,
+                            (SELECT COUNT(*) FROM stores) AS store_count,
+                            (SELECT COUNT(*) FROM stores WHERE LOWER(COALESCE(status, '')) LIKE '%active%') AS active_store_count,
+                            (SELECT COUNT(*) FROM products) AS product_count,
+                            (SELECT COUNT(DISTINCT category_id) FROM products WHERE category_id IS NOT NULL) AS category_count,
+                            (SELECT COUNT(*) FROM reviews) AS review_count,
+                            (SELECT COALESCE(AVG(star_rating), 0) FROM reviews) AS average_rating
+                        """));
 
-        result.put("monthlyRevenue", jdbcTemplate.queryForList("""
-                SELECT
-                    EXTRACT(MONTH FROM o.order_date)::int AS month,
-                    COALESCE(SUM(o.grand_total), 0) AS revenue,
-                    COALESCE(SUM(o.grand_total) FILTER (WHERE LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%'), 0) AS delivered_revenue
-                FROM orders o
-                LEFT JOIN shipments s ON s.order_id = o.id
-                WHERE o.order_date IS NOT NULL
-                GROUP BY EXTRACT(MONTH FROM o.order_date)
-                ORDER BY month
-                """));
+        result.put("monthlyRevenue", safeQueryForList(
+                """
+                        SELECT
+                            EXTRACT(MONTH FROM o.order_date) AS month,
+                            COALESCE(SUM(o.grand_total), 0) AS revenue,
+                            COALESCE(SUM(CASE WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%' THEN o.grand_total ELSE 0 END), 0) AS delivered_revenue
+                        FROM orders o
+                        LEFT JOIN shipments s ON s.order_id = o.id
+                        WHERE o.order_date IS NOT NULL
+                        GROUP BY EXTRACT(MONTH FROM o.order_date)
+                        ORDER BY month
+                        """));
 
-        result.put("statusDistribution", jdbcTemplate.queryForList("""
-                SELECT
-                    CASE
-                        WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%' THEN 'delivered'
-                        WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%ship%' OR LOWER(COALESCE(s.status, o.status, '')) LIKE '%transit%' THEN 'shipped'
-                        WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%process%' THEN 'processing'
-                        WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%cancel%' THEN 'cancelled'
-                        ELSE 'pending'
-                    END AS status,
-                    COUNT(*) AS count
-                FROM orders o
-                LEFT JOIN shipments s ON s.order_id = o.id
-                GROUP BY status
-                ORDER BY count DESC
-                """));
+        result.put("statusDistribution", jdbcTemplate.queryForList(
+                """
+                        SELECT
+                            CASE
+                                WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%deliver%' THEN 'delivered'
+                                WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%ship%' OR LOWER(COALESCE(s.status, o.status, '')) LIKE '%transit%' THEN 'shipped'
+                                WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%process%' THEN 'processing'
+                                WHEN LOWER(COALESCE(s.status, o.status, '')) LIKE '%cancel%' THEN 'cancelled'
+                                ELSE 'pending'
+                            END AS status,
+                            COUNT(*) AS count
+                        FROM orders o
+                        LEFT JOIN shipments s ON s.order_id = o.id
+                        GROUP BY status
+                        ORDER BY count DESC
+                        """));
 
         result.put("roleDistribution", jdbcTemplate.queryForList("""
                 SELECT role_type AS role, COUNT(*) AS count
@@ -89,7 +93,7 @@ public class AnalyticsService {
                 ORDER BY star_rating
                 """));
 
-        result.put("topStores", jdbcTemplate.queryForList("""
+        result.put("topStores", safeQueryForList("""
                 SELECT
                     s.id,
                     s.name,
@@ -114,7 +118,7 @@ public class AnalyticsService {
                 LIMIT 8
                 """));
 
-        result.put("categoryPerformance", jdbcTemplate.queryForList("""
+        result.put("categoryPerformance", safeQueryForList("""
                 SELECT
                     COALESCE(c.name, 'Diğer') AS name,
                     COUNT(DISTINCT p.id) AS product_count,
@@ -128,7 +132,7 @@ public class AnalyticsService {
                 LIMIT 8
                 """));
 
-        result.put("recentReviews", jdbcTemplate.queryForList("""
+        result.put("recentReviews", safeQueryForList("""
                 SELECT
                     r.id,
                     r.star_rating,
@@ -142,7 +146,109 @@ public class AnalyticsService {
                 ORDER BY r.id DESC
                 LIMIT 8
                 """));
+        return result;
+    }
+
+    public Map<String, Object> getCorporateAnalytics(Integer ownerId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        result.put("summary", safeQueryForMap("""
+                SELECT
+                    COUNT(*) AS order_count,
+                    COALESCE(SUM(o.grand_total), 0) AS total_revenue
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id
+                WHERE s.owner_id = ?
+                """, ownerId));
+
+        result.put("products", safeQueryForMap("""
+                SELECT
+                    COUNT(*) AS total_products,
+                    COALESCE(SUM(CASE WHEN p.stock_quantity < 10 THEN 1 ELSE 0 END), 0) AS low_stock_count
+                FROM products p
+                JOIN stores s ON s.id = p.store_id
+                WHERE s.owner_id = ?
+                """, ownerId));
+
+        result.put("recentOrders", safeQueryForList("""
+                SELECT
+                    o.id,
+                    o.order_date,
+                    o.status,
+                    o.grand_total,
+                    u.email AS customer_email
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id
+                JOIN users u ON u.id = o.user_id
+                WHERE s.owner_id = ?
+                ORDER BY o.order_date DESC
+                LIMIT 5
+                """, ownerId));
 
         return result;
     }
+
+    public Map<String, Object> getIndividualAnalytics(Integer userId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // Summary: Total spent and order count
+        result.put("summary", safeQueryForMap("""
+                SELECT
+                    COUNT(*) AS order_count,
+                    COALESCE(SUM(grand_total), 0) AS total_spent
+                FROM orders
+                WHERE user_id = ?
+                """, userId));
+
+        // Shipments: Active vs Total
+        result.put("shipments", safeQueryForMap("""
+                SELECT
+                    COUNT(s.id) AS total_shipments,
+                    COALESCE(SUM(CASE 
+                        WHEN LOWER(COALESCE(s.status, '')) NOT LIKE '%deliver%' 
+                         AND LOWER(COALESCE(s.status, '')) NOT LIKE '%cancel%' 
+                        THEN 1 ELSE 0 END), 0) AS active_shipments
+                FROM orders o
+                LEFT JOIN shipments s ON s.order_id = o.id
+                WHERE o.user_id = ?
+                """, userId));
+
+        // Monthly Spending Trend
+        result.put("monthlySpending", safeQueryForList("""
+                SELECT
+                    EXTRACT(MONTH FROM order_date) AS month,
+                    COALESCE(SUM(grand_total), 0) AS spent
+                FROM orders
+                WHERE user_id = ? AND order_date IS NOT NULL
+                GROUP BY EXTRACT(MONTH FROM order_date)
+                ORDER BY month
+                """, userId));
+
+        return result;
+    }
+
+    private List<Map<String, Object>> safeQueryForList(String sql, Object... args) {
+        try {
+            System.out.println("Executing SQL: " + sql + " with args: " + java.util.Arrays.toString(args));
+            List<Map<String, Object>> list = jdbcTemplate.queryForList(sql, args);
+            return list.stream().map(m -> {
+                Map<String, Object> lowerMap = new LinkedHashMap<>();
+                m.forEach((k, v) -> lowerMap.put(k.toLowerCase(), v));
+                return lowerMap;
+            }).toList();
+        } catch (Exception e) {
+            System.err.println("SQL Execution Error: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    private Map<String, Object> safeQueryForMap(String sql, Object... args) {
+        List<Map<String, Object>> list = safeQueryForList(sql, args);
+        if (list.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        return list.get(0);
+    }
 }
+

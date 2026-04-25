@@ -57,6 +57,10 @@ export class ApiService {
     return this.http.get<T>(`${this.baseUrl}/${endpoint}/${id}`);
   }
 
+  getSummary<T>(endpoint: string): Observable<T> {
+    return this.http.get<T>(`${this.baseUrl}/${endpoint}`);
+  }
+
   create<T>(endpoint: string, body: unknown): Observable<T> {
     return this.http.post<T>(`${this.baseUrl}/${endpoint}`, body);
   }
