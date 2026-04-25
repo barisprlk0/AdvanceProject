@@ -31,8 +31,10 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestBody Order order) {
-        return ResponseEntity.ok(orderService.createOrder(order));
+    public ResponseEntity<Order> createOrder(@RequestBody com.advanceproject.backend.dto.OrderRequest request, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return ResponseEntity.ok(orderService.createOrder(user, request));
     }
 
     @GetMapping

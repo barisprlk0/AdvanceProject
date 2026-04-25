@@ -120,6 +120,11 @@ public class ReviewController {
     }
 
     @DeleteMapping("/{id}")
+    @PostMapping("/{id}/vote")
+    public ResponseEntity<Review> voteHelpful(@PathVariable Integer id) {
+        return ResponseEntity.ok(reviewService.voteHelpful(id));
+    }
+
     public ResponseEntity<Void> deleteReview(@PathVariable Integer id, Authentication authentication) {
         User user = userService.getUserByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));

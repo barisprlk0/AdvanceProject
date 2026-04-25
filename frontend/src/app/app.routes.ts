@@ -27,6 +27,8 @@ export const routes: Routes = [
       { path: 'products/:id', loadComponent: () => import('./features/products/product-detail/product-detail').then(m => m.ProductDetailComponent) },
       { path: 'reviews', loadComponent: () => import('./features/reviews/reviews').then(m => m.ReviewsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'CORPORATE'] } },
       { path: 'shipments', loadComponent: () => import('./features/shipments/shipments').then(m => m.ShipmentsComponent) },
+      { path: 'cart', loadComponent: () => import('./features/cart/cart').then(m => m.CartComponent) },
+      { path: 'checkout', loadComponent: () => import('./features/checkout/checkout').then(m => m.CheckoutComponent) },
       { path: 'analytics', loadComponent: () => import('./features/analytics/analytics').then(m => m.AnalyticsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'CORPORATE'] } },
       { path: 'chatbot', loadComponent: () => import('./features/chatbot/chatbot').then(m => m.ChatbotComponent) },
       { path: 'profile', loadComponent: () => import('./features/profile/profile').then(m => m.ProfileComponent) },

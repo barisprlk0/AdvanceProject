@@ -39,4 +39,13 @@ public class Product {
 
     @Column(name = "unit_price", precision = 10, scale = 2)
     private BigDecimal unitPrice;
+
+    @Column(name = "stock_quantity")
+    private Integer stockQuantity;
+
+    @Column(name = "currency_code", length = 3)
+    private String currencyCode;
+
+    @Column(name = "exchange_rate", precision = 10, scale = 4)
+    private BigDecimal exchangeRate;
 }

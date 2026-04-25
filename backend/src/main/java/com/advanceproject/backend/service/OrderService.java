@@ -21,39 +21,75 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final com.advanceproject.backend.repository.ProductRepository productRepository;
+    private final com.advanceproject.backend.repository.StoreRepository storeRepository;
+    private final com.advanceproject.backend.repository.AuditLogRepository auditLogRepository;
 
     @Autowired
-    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository) {
+    public OrderService(OrderRepository orderRepository, 
+                        OrderItemRepository orderItemRepository,
+                        com.advanceproject.backend.repository.ProductRepository productRepository,
+                        com.advanceproject.backend.repository.StoreRepository storeRepository,
+                        com.advanceproject.backend.repository.AuditLogRepository auditLogRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
+        this.productRepository = productRepository;
+        this.storeRepository = storeRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
-    public Order createOrder(Order order) {
-        if (order.getOrderDate() == null) {
-            order.setOrderDate(LocalDateTime.now());
-        }
-        if (order.getStatus() == null) {
-            order.setStatus("Pending");
-        }
-        
-        // If items are provided, calculate total, otherwise keep the incoming grandTotal
-        if (order.getItems() != null && !order.getItems().isEmpty()) {
-            BigDecimal total = BigDecimal.ZERO;
-            for (OrderItem item : order.getItems()) {
-                BigDecimal itemTotal = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
-                total = total.add(itemTotal);
+    public Order createOrder(User user, com.advanceproject.backend.dto.OrderRequest request) {
+        Store store = storeRepository.findById(request.getStoreId())
+                .orElseThrow(() -> new RuntimeException("Store not found"));
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setStore(store);
+        order.setOrderDate(LocalDateTime.now());
+        order.setStatus("Pending");
+        order.setPaymentMethod(request.getPaymentMethod());
+
+        BigDecimal total = BigDecimal.ZERO;
+        java.util.List<OrderItem> items = new java.util.ArrayList<>();
+
+        for (com.advanceproject.backend.dto.OrderRequest.OrderItemRequest itemReq : request.getItems()) {
+            com.advanceproject.backend.entity.Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
+
+            // Check stock
+            if (product.getStockQuantity() != null && product.getStockQuantity() < itemReq.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for product: " + product.getName());
             }
-            order.setGrandTotal(total);
+
+            // Reduce stock
+            if (product.getStockQuantity() != null) {
+                product.setStockQuantity(product.getStockQuantity() - itemReq.getQuantity());
+                productRepository.save(product);
+            }
+
+            OrderItem item = new OrderItem();
+            item.setProduct(product);
+            item.setQuantity(itemReq.getQuantity());
+            item.setPrice(product.getUnitPrice()); // Use DB price, not request price
+            item.setOrder(order);
+            items.add(item);
+
+            BigDecimal itemTotal = product.getUnitPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+            total = total.add(itemTotal);
         }
+
+        order.setGrandTotal(total);
+        order.setItems(items);
 
         Order savedOrder = orderRepository.save(order);
-
-        if (order.getItems() != null) {
-            for (OrderItem item : order.getItems()) {
-                item.setOrder(savedOrder);
-                orderItemRepository.save(item);
-            }
-        }
+        
+        // Audit Log
+        com.advanceproject.backend.entity.AuditLog log = new com.advanceproject.backend.entity.AuditLog();
+        log.setUser(user);
+        log.setAction("ORDER_CREATED");
+        log.setDetails("Order ID: " + savedOrder.getId() + ", Total: " + total);
+        log.setTimestamp(LocalDateTime.now());
+        auditLogRepository.save(log);
 
         return savedOrder;
     }
