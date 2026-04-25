@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, signal } from 
 import { RouterLink } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 Chart.register(...registerables);
 
@@ -20,6 +21,9 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   @ViewChild('ratingChart') ratingCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = signal(true);
+  isCorporate = signal(false);
+  fromDate = signal('');
+  toDate = signal('');
   kpis = signal<Kpi[]>([]);
   topStores = signal<any[]>([]);
   categoryRows = signal<any[]>([]);
@@ -33,9 +37,10 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   private chartsReady = false;
   private charts: Chart[] = [];
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private auth: AuthService) {}
 
   ngOnInit(): void {
+    this.isCorporate.set(this.auth.hasRole('CORPORATE'));
     this.loadData();
   }
 
@@ -46,9 +51,18 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
 
   loadData(): void {
     this.loading.set(true);
-    this.api.getById<any>('analytics', 'admin').subscribe({
+    const endpoint = this.isCorporate() ? 'analytics/corporate' : 'analytics/admin';
+    const params: Record<string, string> = {};
+    if (this.isCorporate() && this.fromDate()) {
+      params['fromDate'] = this.fromDate();
+    }
+    if (this.isCorporate() && this.toDate()) {
+      params['toDate'] = this.toDate();
+    }
+
+    this.api.getEndpoint<any>(endpoint, params).subscribe({
       next: (data) => {
-        this.buildAnalytics(data);
+        this.buildAnalytics((data as any) || {});
         this.loading.set(false);
         setTimeout(() => this.renderCharts(), 0);
       },
@@ -58,7 +72,25 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     });
   }
 
+  applyDateRange(): void {
+    if (this.fromDate() && this.toDate() && this.fromDate() > this.toDate()) {
+      return;
+    }
+    this.loadData();
+  }
+
+  resetDateRange(): void {
+    this.fromDate.set('');
+    this.toDate.set('');
+    this.loadData();
+  }
+
   private buildAnalytics(data: any): void {
+    if (this.isCorporate()) {
+      this.buildCorporateAnalytics(data);
+      return;
+    }
+
     const summary = data.summary || {};
     const completionData = data.completion || {};
     const platform = data.platform || {};
@@ -105,6 +137,64 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
 
     this.recentReviews.set(data.recentReviews || []);
     this.orderStatusRows.set(this.buildStatusRows());
+  }
+
+  private buildCorporateAnalytics(data: any): void {
+    const summary = data.summary || {};
+    const products = data.products || {};
+    const recentOrders = data.recentOrders || [];
+    const customerSegments = data.customerSegments || [];
+    const revenueByCategory = data.revenueByCategory || [];
+
+    const totalRevenue = this.num(summary.total_revenue);
+    const orderCount = this.num(summary.order_count);
+    const avgOrder = orderCount ? totalRevenue / orderCount : 0;
+    const totalProducts = this.num(products.total_products);
+    const lowStock = this.num(products.low_stock_count);
+
+    this.kpis.set([
+      { label: 'Toplam Gelir', value: this.money(totalRevenue), detail: `${orderCount} siparis`, tone: 'primary' },
+      { label: 'Ortalama Siparis', value: this.money(avgOrder), detail: 'siparis basina', tone: 'success' },
+      { label: 'Toplam Urun', value: totalProducts.toLocaleString('tr-TR'), detail: `${lowStock} dusuk stok`, tone: lowStock > 0 ? 'warning' : 'success' },
+      { label: 'Musteri Segmenti', value: customerSegments.length.toLocaleString('tr-TR'), detail: 'farkli segment', tone: 'primary' }
+    ]);
+
+    this.monthlyRevenue = [];
+    this.statusDistribution = [];
+    this.roleDistribution = [];
+    this.ratingDistribution = [];
+
+    this.topStores.set(customerSegments.map((row: any, idx: number) => ({
+      id: idx + 1,
+      name: row.segment || 'Segment',
+      owner: '-',
+      status: 'Segment',
+      products: 0,
+      orders: this.num(row.customer_count),
+      revenue: this.money(this.num(row.revenue))
+    })));
+
+    this.categoryRows.set(revenueByCategory.map((row: any) => ({
+      name: row.name || 'Diger',
+      products: 0,
+      orders: this.num(row.sold_count),
+      revenue: this.money(this.num(row.revenue))
+    })));
+
+    this.recentReviews.set((recentOrders || []).map((row: any) => ({
+      id: row.id,
+      product_name: `Siparis #${row.id}`,
+      user_email: row.customer_email,
+      star_rating: 0,
+      sentiment: `${row.status || 'Unknown'} - ${this.money(this.num(row.grand_total))}`
+    })));
+
+    const pending = recentOrders.filter((row: any) => !`${row.status || ''}`.toLowerCase().includes('deliver')).length;
+    const delivered = Math.max(0, recentOrders.length - pending);
+    this.orderStatusRows.set([
+      { label: 'Teslim Edildi', count: delivered, percent: recentOrders.length ? Math.round((delivered / recentOrders.length) * 100) : 0, className: 'success' },
+      { label: 'Bekliyor', count: pending, percent: recentOrders.length ? Math.round((pending / recentOrders.length) * 100) : 0, className: 'warning' }
+    ]);
   }
 
   private buildStoreRows(): any[] {

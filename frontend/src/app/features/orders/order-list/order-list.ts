@@ -18,6 +18,8 @@ export class OrderListComponent implements OnInit {
   orders = signal<any[]>([]);
   allMappedOrders = signal<any[]>([]);
   shipments = signal<Shipment[]>([]);
+  shippingOrderIds = signal<number[]>([]);
+  private shipInFlight = new Set<number>();
   loading = signal(true);
 
   currentPage = signal(0);
@@ -26,11 +28,11 @@ export class OrderListComponent implements OnInit {
   totalPages = signal(0);
 
   tabs = signal([
-    { key: 'all', label: 'Tümü', count: 0 },
-    { key: 'processing', label: 'Hazırlanıyor', count: 0 },
+    { key: 'all', label: 'Tumu', count: 0 },
+    { key: 'processing', label: 'Hazirlaniyor', count: 0 },
     { key: 'shipped', label: 'Kargoda', count: 0 },
     { key: 'delivered', label: 'Teslim Edildi', count: 0 },
-    { key: 'cancelled', label: 'İptal', count: 0 }
+    { key: 'cancelled', label: 'Iptal', count: 0 }
   ]);
 
   canManageOrders = computed(() => {
@@ -80,7 +82,7 @@ export class OrderListComponent implements OnInit {
       return {
         id: order.id,
         displayId: `ORD-${order.id}`,
-        customer: order.user?.email?.split('@')[0] || `Müşteri #${order.user?.id || '?'}`,
+        customer: order.user?.email?.split('@')[0] || `Musteri #${order.user?.id || '?'}`,
         email: order.user?.email || '-',
         items: order.items?.length || 0,
         amount: order.grandTotal || 0,
@@ -122,22 +124,47 @@ export class OrderListComponent implements OnInit {
     this.api.patch('orders', order.id, { status: newStatus }).subscribe({
       next: () => {
         this.syncShipmentStatus(order.id, newStatus);
-        this.toast.success('Sipariş durumu güncellendi.');
+        this.toast.success('Siparis durumu guncellendi.');
         this.fetchOrders();
       },
-      error: () => this.toast.error('Güncelleme başarısız.')
+      error: () => this.toast.error('Guncelleme basarisiz.')
     });
   }
 
   shipOrder(order: any, event: Event): void {
     event.stopPropagation();
-    this.api.create(`orders/${order.id}/ship`, {}).subscribe({
+    if (!this.canShip(order)) return;
+
+    const orderId = Number(order?.id);
+    if (!Number.isFinite(orderId) || this.shipInFlight.has(orderId)) return;
+
+    this.shipInFlight.add(orderId);
+    this.shippingOrderIds.update(ids => ids.includes(orderId) ? ids : [...ids, orderId]);
+    this.markOrderAsShippedLocally(orderId);
+
+    this.api.create(`orders/${orderId}/ship`, {}).subscribe({
       next: () => {
-        this.toast.success('Sipariş kargoya verildi ve kargo kaydı oluşturuldu.');
+        this.toast.success('Siparis kargoya verildi.');
         this.fetchOrders();
       },
-      error: () => this.toast.error('Kargolama işlemi başarısız oldu.')
+      error: () => this.toast.error('Kargolama islemi basarisiz oldu.'),
+      complete: () => {
+        this.shipInFlight.delete(orderId);
+        this.shippingOrderIds.update(ids => ids.filter(id => id !== orderId));
+      }
     });
+  }
+
+  canShip(order: any): boolean {
+    if (!this.auth.hasRole('CORPORATE')) return false;
+    if (this.isShipping(order.id)) return false;
+
+    const status = this.normalizeStatus(order?.rawStatus);
+    return !this.isFinalStatus(status) && !this.isShippedStatus(status);
+  }
+
+  isShipping(orderId: number): boolean {
+    return this.shippingOrderIds().includes(orderId);
   }
 
   getInitial(name: string): string {
@@ -153,14 +180,30 @@ export class OrderListComponent implements OnInit {
     const s = this.normalizeStatus(status);
     if (s.includes('deliver') || s.includes('teslim')) return 'Teslim Edildi';
     if (s.includes('ship') || s.includes('transit') || s.includes('kargo')) return 'Kargoda';
-    if (s.includes('process') || s.includes('hazır')) return 'Hazırlanıyor';
-    if (s.includes('cancel') || s.includes('iptal')) return 'İptal Edildi';
+    if (s.includes('process') || s.includes('hazir')) return 'Hazirlaniyor';
+    if (s.includes('cancel') || s.includes('iptal')) return 'Iptal Edildi';
     return 'Bekliyor';
   }
 
   private getEffectiveStatus(order: Order, shipments: Shipment[]): string {
-    const shipment = shipments.find(item => item.order?.id === order.id);
-    return shipment?.status || order.status || 'Pending';
+    const list = shipments.filter(item => item.order?.id === order.id);
+    const orderStatus = this.normalizeStatus(order.status);
+
+    if (this.isFinalStatus(orderStatus)) {
+      return order.status || 'Pending';
+    }
+
+    if (!list.length) {
+      return order.status || 'Pending';
+    }
+
+    const delivered = list.find(item => this.isFinalStatus(item.status));
+    if (delivered?.status) {
+      return delivered.status;
+    }
+
+    const latest = list.reduce((max, cur) => ((cur.id || 0) > (max.id || 0) ? cur : max), list[0]);
+    return latest?.status || order.status || 'Pending';
   }
 
   private syncShipmentStatus(orderId: number, status: string): void {
@@ -190,12 +233,62 @@ export class OrderListComponent implements OnInit {
     return (status || '').toLowerCase();
   }
 
+  private isShippedStatus(status: string | null | undefined): boolean {
+    const s = this.normalizeStatus(status);
+    return s.includes('ship') || s.includes('transit') || s.includes('kargo');
+  }
+
+  private markOrderAsShippedLocally(orderId: number): void {
+    const mutate = (list: any[]) =>
+      list.map(row => row.id === orderId
+        ? { ...row, rawStatus: 'In Transit', status: 'Kargoda', statusKey: 'warning' }
+        : row);
+
+    this.allMappedOrders.update(mutate);
+    this.orders.set(this.filterByActiveTab(this.allMappedOrders()));
+    this.cdr.detectChanges();
+  }
+
   private getStatusClass(status: string | null | undefined): string {
     const s = this.normalizeStatus(status);
     if (s.includes('deliver') || s.includes('teslim')) return 'success';
     if (s.includes('ship') || s.includes('transit') || s.includes('kargo')) return 'warning';
-    if (s.includes('process') || s.includes('hazır')) return 'primary';
+    if (s.includes('process') || s.includes('hazir')) return 'primary';
     if (s.includes('cancel') || s.includes('iptal')) return 'danger';
     return 'secondary';
+  }
+
+  exportOrders(): void {
+    const rows = this.orders();
+    if (!rows.length) {
+      this.toast.warning('Disa aktarilacak siparis bulunamadi.');
+      return;
+    }
+
+    const headers = ['SiparisNo', 'Musteri', 'Email', 'UrunSayisi', 'Tutar', 'Odeme', 'Durum', 'Tarih'];
+    const csvRows = rows.map(order => [
+      `#${order.id}`,
+      order.customer || '',
+      order.email || '',
+      order.items ?? 0,
+      order.amount ?? 0,
+      order.payment || '',
+      order.status || '',
+      order.date || ''
+    ]);
+    const csv = [headers, ...csvRows]
+      .map(cols => cols.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `siparisler_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    this.toast.success('Siparisler CSV olarak disa aktarildi.');
   }
 }

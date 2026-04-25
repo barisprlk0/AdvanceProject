@@ -30,6 +30,18 @@ public class CustomerProfileService {
         return customerProfileRepository.findAll();
     }
 
+    public Optional<CustomerProfile> getByUserId(Integer userId) {
+        return customerProfileRepository.findByUser_Id(userId);
+    }
+
+    public List<CustomerProfile> getVisibleByStoreOwner(Integer ownerId) {
+        return customerProfileRepository.findVisibleByStoreOwner(ownerId);
+    }
+
+    public boolean isVisibleByStoreOwner(Integer ownerId, Integer profileId) {
+        return customerProfileRepository.existsVisibleByStoreOwner(ownerId, profileId);
+    }
+
     public CustomerProfile updateCustomerProfile(Integer id, CustomerProfile updatedCustomerProfile) {
         return customerProfileRepository.findById(id).map(customerProfile -> {
             customerProfile.setAge(updatedCustomerProfile.getAge());

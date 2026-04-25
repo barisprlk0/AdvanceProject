@@ -1,7 +1,9 @@
 package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.entity.Shipment;
+import com.advanceproject.backend.entity.Order;
 import com.advanceproject.backend.entity.User;
+import com.advanceproject.backend.service.OrderService;
 import com.advanceproject.backend.service.ShipmentService;
 import com.advanceproject.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +21,39 @@ public class ShipmentController {
 
     private final ShipmentService shipmentService;
     private final UserService userService;
+    private final OrderService orderService;
 
     @Autowired
-    public ShipmentController(ShipmentService shipmentService, UserService userService) {
+    public ShipmentController(ShipmentService shipmentService, UserService userService, OrderService orderService) {
         this.shipmentService = shipmentService;
         this.userService = userService;
+        this.orderService = orderService;
     }
 
     @PostMapping
-    public ResponseEntity<Shipment> createShipment(@RequestBody Shipment shipment) {
+    public ResponseEntity<Shipment> createShipment(@RequestBody Shipment shipment, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !"CORPORATE".equalsIgnoreCase(user.getRoleType())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        if (shipment.getOrder() == null || shipment.getOrder().getId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Order order = orderService.getOrderById(shipment.getOrder().getId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            if (order.getStore() == null || order.getStore().getOwner() == null ||
+                    !order.getStore().getOwner().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).build();
+            }
+        }
+
+        shipment.setOrder(order);
         return ResponseEntity.ok(shipmentService.createShipment(shipment));
     }
 

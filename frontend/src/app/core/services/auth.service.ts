@@ -2,12 +2,13 @@ import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { User, UserRole, AuthResponse, LoginRequest, RegisterRequest, mapRoleType, getUserDisplayName } from '../models';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map, Observable, tap, throwError } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly currentUser = signal<User | null>(this.loadUserFromStorage());
   private readonly token = signal<string | null>(this.loadTokenFromStorage());
+  private readonly refreshToken = signal<string | null>(this.loadRefreshTokenFromStorage());
 
   readonly user = this.currentUser.asReadonly();
   readonly isAuthenticated = computed(() => !!this.token());
@@ -37,8 +38,41 @@ export class AuthService {
     return token;
   }
 
+  private loadRefreshTokenFromStorage(): string | null {
+    const token = localStorage.getItem('sl_refresh_token');
+    if (!token || token === 'null' || token === 'undefined') return null;
+    return token;
+  }
+
   getToken(): string | null {
     return this.token();
+  }
+
+  getRefreshToken(): string | null {
+    return this.refreshToken();
+  }
+
+  private setAuthSession(authResp: AuthResponse): void {
+    localStorage.setItem('sl_token', authResp.token);
+    this.token.set(authResp.token);
+
+    if (authResp.refreshToken) {
+      localStorage.setItem('sl_refresh_token', authResp.refreshToken);
+      this.refreshToken.set(authResp.refreshToken);
+    } else {
+      localStorage.removeItem('sl_refresh_token');
+      this.refreshToken.set(null);
+    }
+
+    const user: User = {
+      id: authResp.id,
+      email: authResp.email,
+      roleType: authResp.roleType,
+      gender: authResp.gender
+    };
+
+    localStorage.setItem('sl_user', JSON.stringify(user));
+    this.currentUser.set(user);
   }
 
   async login(request: LoginRequest): Promise<boolean> {
@@ -46,19 +80,7 @@ export class AuthService {
       const authResp = await firstValueFrom(
         this.http.post<AuthResponse>('/api/auth/login', request)
       );
-
-      localStorage.setItem('sl_token', authResp.token);
-      this.token.set(authResp.token);
-
-      const user: User = {
-        id: authResp.id,
-        email: authResp.email,
-        roleType: authResp.roleType,
-        gender: authResp.gender
-      };
-
-      localStorage.setItem('sl_user', JSON.stringify(user));
-      this.currentUser.set(user);
+      this.setAuthSession(authResp);
       return true;
     } catch (err: any) {
       console.error('Backend login failed:', err);
@@ -80,22 +102,24 @@ export class AuthService {
       const authResp = await firstValueFrom(
         this.http.post<AuthResponse>('/api/auth/register', request)
       );
-      localStorage.setItem('sl_token', authResp.token);
-      this.token.set(authResp.token);
-
-      const user: User = {
-        id: authResp.id,
-        email: authResp.email,
-        roleType: authResp.roleType,
-        gender: authResp.gender
-      };
-      localStorage.setItem('sl_user', JSON.stringify(user));
-      this.currentUser.set(user);
+      this.setAuthSession(authResp);
       return true;
     } catch (err: any) {
       console.error('Backend register failed:', err);
       throw err;
     }
+  }
+
+  refreshAccessToken(): Observable<string> {
+    const refresh = this.getRefreshToken();
+    if (!refresh) {
+      return throwError(() => new Error('Refresh token not found'));
+    }
+
+    return this.http.post<AuthResponse>('/api/auth/refresh', { refreshToken: refresh }).pipe(
+      tap((resp) => this.setAuthSession(resp)),
+      map((resp) => resp.token)
+    );
   }
 
   updateCurrentUser(user: User): void {
@@ -105,8 +129,10 @@ export class AuthService {
 
   logout(): void {
     localStorage.removeItem('sl_token');
+    localStorage.removeItem('sl_refresh_token');
     localStorage.removeItem('sl_user');
     this.token.set(null);
+    this.refreshToken.set(null);
     this.currentUser.set(null);
     this.router.navigate(['/login']);
   }

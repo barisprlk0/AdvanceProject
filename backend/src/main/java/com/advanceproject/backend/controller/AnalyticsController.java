@@ -5,10 +5,13 @@ import com.advanceproject.backend.service.AnalyticsService;
 import com.advanceproject.backend.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -29,27 +32,57 @@ public class AnalyticsController {
     }
 
     @GetMapping("/admin")
-    public ResponseEntity<Map<String, Object>> getAdminAnalytics(Authentication authentication) {
-        User user = userService.getUserByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public ResponseEntity<?> getAdminAnalytics(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Authentication is null"));
+            }
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
-            return ResponseEntity.status(403).build();
+            User user = userService.getUserByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+                return ResponseEntity.status(403).build();
+            }
+
+            return ResponseEntity.ok(analyticsService.getAdminAnalytics());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Failed to load admin analytics",
+                    "message", e.getMessage(),
+                    "type", e.getClass().getName()
+            ));
         }
-
-        return ResponseEntity.ok(analyticsService.getAdminAnalytics());
     }
 
     @GetMapping("/corporate")
-    public ResponseEntity<Map<String, Object>> getCorporateAnalytics(Authentication authentication) {
-        User user = userService.getUserByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public ResponseEntity<?> getCorporateAnalytics(
+            Authentication authentication,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
+    ) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Authentication is null"));
+            }
 
-        if (!"CORPORATE".equalsIgnoreCase(user.getRoleType()) && !"ADMIN".equalsIgnoreCase(user.getRoleType())) {
-            return ResponseEntity.status(403).build();
+            User user = userService.getUserByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!"CORPORATE".equalsIgnoreCase(user.getRoleType()) && !"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+                return ResponseEntity.status(403).build();
+            }
+
+            return ResponseEntity.ok(analyticsService.getCorporateAnalytics(user.getId(), fromDate, toDate));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Failed to load corporate analytics",
+                    "message", e.getMessage(),
+                    "type", e.getClass().getName()
+            ));
         }
-
-        return ResponseEntity.ok(analyticsService.getCorporateAnalytics(user.getId()));
     }
 
     @GetMapping("/individual")

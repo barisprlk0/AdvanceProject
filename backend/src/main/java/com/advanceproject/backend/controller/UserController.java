@@ -1,12 +1,15 @@
 package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.entity.User;
+import com.advanceproject.backend.dto.ChangePasswordRequest;
 import com.advanceproject.backend.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,10 +19,12 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public UserController(UserService userService) {
+    public UserController(UserService userService, PasswordEncoder passwordEncoder) {
         this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping
@@ -55,6 +60,14 @@ public class UserController {
 
         user.setRoleType(currentUser.getRoleType());
         return ResponseEntity.ok(userService.patchUser(currentUser.getId(), user));
+    }
+
+    @PostMapping("/profile/change-password")
+    public ResponseEntity<Void> changePassword(Authentication authentication, @Valid @RequestBody ChangePasswordRequest request) {
+        User currentUser = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        userService.changePassword(currentUser.getId(), request.getCurrentPassword(), request.getNewPassword(), passwordEncoder);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")

@@ -127,19 +127,54 @@ public class OrderController {
             return ResponseEntity.status(403).build();
         }
 
-        // Update status
+        List<Shipment> existingShipments = shipmentService.getShipmentsByOrderId(id);
+        String currentOrderStatus = normalizeStatus(order.getStatus());
+
+        if (isFinalOrderStatus(currentOrderStatus)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        boolean alreadyShipped = existingShipments.stream()
+                .map(Shipment::getStatus)
+                .map(this::normalizeStatus)
+                .anyMatch(status -> status.contains("transit") || status.contains("ship") || status.contains("kargo"));
+        boolean alreadyFinalized = existingShipments.stream()
+                .map(Shipment::getStatus)
+                .map(this::normalizeStatus)
+                .anyMatch(this::isFinalOrderStatus);
+        if (alreadyShipped || alreadyFinalized || currentOrderStatus.contains("ship") || currentOrderStatus.contains("kargo")) {
+            return ResponseEntity.status(409).build();
+        }
+
         order.setStatus("Shipped");
         Order updatedOrder = orderService.updateOrder(id, order);
 
-        // Auto-create shipment
-        Shipment shipment = new Shipment();
+        Shipment shipment = existingShipments.stream()
+                .max((a, b) -> Integer.compare(a.getId() == null ? 0 : a.getId(), b.getId() == null ? 0 : b.getId()))
+                .orElseGet(Shipment::new);
+
         shipment.setOrder(updatedOrder);
         shipment.setStatus("In Transit");
-        shipment.setMode("Express");
-        shipment.setWarehouse("Main Store");
+        if (shipment.getMode() == null || shipment.getMode().isBlank()) {
+            shipment.setMode("Express");
+        }
+        if (shipment.getWarehouse() == null || shipment.getWarehouse().isBlank()) {
+            shipment.setWarehouse("Main Store");
+        }
         shipmentService.createShipment(shipment);
 
         return ResponseEntity.ok(updatedOrder);
+    }
+
+    private boolean isFinalOrderStatus(String normalizedStatus) {
+        return normalizedStatus.contains("deliver")
+                || normalizedStatus.contains("teslim")
+                || normalizedStatus.contains("cancel")
+                || normalizedStatus.contains("iptal");
+    }
+
+    private String normalizeStatus(String status) {
+        return status == null ? "" : status.toLowerCase();
     }
 
     private boolean canAccessOrder(User user, Order order) {

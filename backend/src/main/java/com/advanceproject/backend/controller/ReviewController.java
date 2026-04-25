@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -119,12 +120,23 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.patchReview(id, review));
     }
 
-    @DeleteMapping("/{id}")
     @PostMapping("/{id}/vote")
-    public ResponseEntity<Review> voteHelpful(@PathVariable Integer id) {
-        return ResponseEntity.ok(reviewService.voteHelpful(id));
+    public ResponseEntity<?> voteHelpful(@PathVariable Integer id, Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        try {
+            return ResponseEntity.ok(reviewService.voteHelpful(id, user));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
     }
 
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReview(@PathVariable Integer id, Authentication authentication) {
         User user = userService.getUserByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));

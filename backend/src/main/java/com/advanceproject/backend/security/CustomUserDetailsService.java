@@ -26,11 +26,14 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
 
         String role = user.getRoleType() != null ? user.getRoleType().toUpperCase() : "INDIVIDUAL";
+        boolean suspended = "SUSPENDED".equalsIgnoreCase(role);
+        String authorityRole = suspended ? "INDIVIDUAL" : role;
         
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPasswordHash())
-                .authorities("ROLE_" + role)
+                .authorities("ROLE_" + authorityRole)
+                .disabled(suspended)
                 .build();
     }
 }

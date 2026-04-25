@@ -27,6 +27,7 @@ export function getUserDisplayName(user: User | null): string {
 // --- Auth ---
 export interface AuthResponse {
   token: string;
+  refreshToken?: string;
   email: string;
   id: number;
   roleType: string;

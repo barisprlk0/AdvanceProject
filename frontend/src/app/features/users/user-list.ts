@@ -62,6 +62,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton';
                       <option value="INDIVIDUAL">Bireysel</option>
                       <option value="CORPORATE">Kurumsal</option>
                       <option value="ADMIN">Admin</option>
+                      <option value="SUSPENDED">Askida</option>
                     </select>
                   </td>
                   <td>
@@ -150,6 +151,7 @@ export class UserListComponent implements OnInit {
   }
 
   getRoleClass(roleType: string): string {
+    if ((roleType || '').toUpperCase() === 'SUSPENDED') return 'danger';
     const r = mapRoleType(roleType);
     if (r === 'ADMIN') return 'warning';
     if (r === 'CORPORATE') return 'secondary';

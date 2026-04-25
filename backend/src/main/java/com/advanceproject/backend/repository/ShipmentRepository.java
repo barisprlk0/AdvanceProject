@@ -14,4 +14,5 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Integer> {
     List<Shipment> findByOrderUserId(Integer userId);
     Page<Shipment> findByOrderStoreOwnerId(Integer ownerId, Pageable pageable);
     List<Shipment> findByOrderStoreOwnerId(Integer ownerId);
+    List<Shipment> findByOrderId(Integer orderId);
 }

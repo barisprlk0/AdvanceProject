@@ -52,6 +52,18 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: ['ADMIN'] }
       },
+      {
+        path: 'audit-logs',
+        loadComponent: () => import('./features/admin/audit-logs').then(m => m.AuditLogsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] }
+      },
+      {
+        path: 'system-settings',
+        loadComponent: () => import('./features/admin/system-settings').then(m => m.SystemSettingsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] }
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

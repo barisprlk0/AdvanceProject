@@ -10,7 +10,7 @@ import { ToastService } from '../../core/services/toast.service';
   template: `
     <div class="fade-in">
       <div class="page-header">
-        <h1 class="page-title">Profil Ayarları</h1>
+        <h1 class="page-title">Profil Ayarlari</h1>
       </div>
       <div class="profile-layout">
         <div class="card profile-card">
@@ -25,7 +25,7 @@ import { ToastService } from '../../core/services/toast.service';
           <div class="profile-info">
             <div class="info-row"><span class="info-label">E-posta</span><span>{{ auth.user()?.email }}</span></div>
             <div class="info-row"><span class="info-label">Rol</span><span>{{ auth.user()?.roleType }}</span></div>
-            <div class="info-row"><span class="info-label">Cinsiyet</span><span>{{ auth.user()?.gender || '—' }}</span></div>
+            <div class="info-row"><span class="info-label">Cinsiyet</span><span>{{ auth.user()?.gender || '-' }}</span></div>
           </div>
         </div>
         <div class="profile-forms">
@@ -39,19 +39,27 @@ import { ToastService } from '../../core/services/toast.service';
               <label class="form-label">Cinsiyet</label>
               <select class="form-select" [(ngModel)]="gender">
                 <option value="Male">Erkek</option>
-                <option value="Female">Kadın</option>
-                <option value="Other">Diğer</option>
+                <option value="Female">Kadin</option>
+                <option value="Other">Diger</option>
               </select>
             </div>
             <button class="btn btn-primary" (click)="saveProfile()" [disabled]="isLoading()">
-              @if (isLoading()) { <span class="spinner spinner-sm"></span> Kaydediliyor... } @else { Değişiklikleri Kaydet }
+              @if (isLoading()) { <span class="spinner spinner-sm"></span> Kaydediliyor... } @else { Degisiklikleri Kaydet }
             </button>
           </div>
           <div class="card">
-            <h3 class="card-title" style="margin-bottom:20px">Şifre Değiştir</h3>
-            <div class="form-group"><label class="form-label">Mevcut Şifre</label><input class="form-input" type="password" placeholder="••••••••"></div>
-            <div class="form-group"><label class="form-label">Yeni Şifre</label><input class="form-input" type="password" placeholder="••••••••"></div>
-            <button class="btn btn-primary" (click)="updatePassword()">Şifreyi Güncelle</button>
+            <h3 class="card-title" style="margin-bottom:20px">Sifre Degistir</h3>
+            <div class="form-group">
+              <label class="form-label">Mevcut Sifre</label>
+              <input class="form-input" type="password" [(ngModel)]="currentPassword" placeholder="********">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Yeni Sifre</label>
+              <input class="form-input" type="password" [(ngModel)]="newPassword" placeholder="********">
+            </div>
+            <button class="btn btn-primary" (click)="updatePassword()" [disabled]="isChangingPassword()">
+              @if (isChangingPassword()) { Guncelleniyor... } @else { Sifreyi Guncelle }
+            </button>
           </div>
         </div>
       </div>
@@ -77,6 +85,10 @@ export class ProfileComponent {
   gender = '';
   isLoading = signal(false);
 
+  currentPassword = '';
+  newPassword = '';
+  isChangingPassword = signal(false);
+
   constructor(
     public auth: AuthService,
     private api: ApiService,
@@ -100,17 +112,41 @@ export class ProfileComponent {
     }).subscribe({
       next: (updatedUser: any) => {
         this.isLoading.set(false);
-        this.toast.success('Profil başarıyla güncellendi.');
-        this.auth.updateCurrentUser(updatedUser); 
+        this.toast.success('Profil basariyla guncellendi.');
+        this.auth.updateCurrentUser(updatedUser);
       },
       error: () => {
         this.isLoading.set(false);
-        this.toast.error('Güncelleme sırasında bir hata oluştu.');
+        this.toast.error('Guncelleme sirasinda bir hata olustu.');
       }
     });
   }
 
   updatePassword(): void {
-    this.toast.info('Şifre güncelleme özelliği şu an aktif değil.');
+    if (!this.currentPassword.trim() || !this.newPassword.trim()) {
+      this.toast.warning('Mevcut ve yeni sifre alanlari zorunludur.');
+      return;
+    }
+    if (this.newPassword.trim().length < 6) {
+      this.toast.warning('Yeni sifre en az 6 karakter olmalidir.');
+      return;
+    }
+
+    this.isChangingPassword.set(true);
+    this.api.postEndpoint<void>('users/profile/change-password', {
+      currentPassword: this.currentPassword,
+      newPassword: this.newPassword
+    }).subscribe({
+      next: () => {
+        this.isChangingPassword.set(false);
+        this.currentPassword = '';
+        this.newPassword = '';
+        this.toast.success('Sifre basariyla guncellendi.');
+      },
+      error: (err) => {
+        this.isChangingPassword.set(false);
+        this.toast.error(err?.error?.message || 'Sifre guncellenemedi.');
+      }
+    });
   }
 }
