@@ -3,6 +3,8 @@ package com.advanceproject.backend.service;
 import com.advanceproject.backend.entity.Product;
 import com.advanceproject.backend.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +30,14 @@ public class ProductService {
 
     public List<Product> getAllProducts() {
         return productRepository.findAll();
+    }
+
+    public Page<Product> getAllProducts(Pageable pageable) {
+        return productRepository.findAll(pageable);
+    }
+
+    public Page<Product> getProductsByOwnerId(Integer ownerId, Pageable pageable) {
+        return productRepository.findByStoreOwnerId(ownerId, pageable);
     }
 
     public Product updateProduct(Integer id, Product updatedProduct) {

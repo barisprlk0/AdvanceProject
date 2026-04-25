@@ -48,7 +48,7 @@ export class RegisterComponent {
       });
 
       if (success) {
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/app/dashboard']);
       } else {
         this.errorMessage.set('Kayıt oluşturulamadı.');
       }

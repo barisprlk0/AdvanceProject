@@ -2,6 +2,7 @@ import { Component, signal, OnInit, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Product, PageResponse } from '../../../core/models';
 import { ProductFormComponent } from '../product-form/product-form';
 import { SkeletonComponent } from '../../../shared/components/skeleton/skeleton';
@@ -22,7 +23,7 @@ export class ProductListComponent implements OnInit {
   loading = signal(true);
   searchQuery = signal('');
   currentPage = signal(0);
-  pageSize = signal(12);
+  pageSize = signal(10);
   totalElements = signal(0);
   totalPages = signal(0);
 
@@ -34,8 +35,13 @@ export class ProductListComponent implements OnInit {
     { value: 'all', label: 'Tüm Kategoriler' },
   ]);
   selectedCategory = signal('all');
+  
+  canManageProducts = computed(() => {
+    const role = this.auth.userRole();
+    return role === 'ADMIN' || role === 'CORPORATE';
+  });
 
-  constructor(private api: ApiService, private toast: ToastService) {}
+  constructor(private api: ApiService, private toast: ToastService, private auth: AuthService) {}
 
   ngOnInit(): void {
     this.fetchProducts();

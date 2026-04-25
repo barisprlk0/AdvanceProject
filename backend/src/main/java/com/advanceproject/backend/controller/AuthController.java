@@ -47,8 +47,17 @@ public class AuthController {
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.getEmail());
         final String jwt = jwtUtil.generateToken(userDetails);
+        
+        User user = userService.getUserByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found after authentication"));
 
-        return ResponseEntity.ok(new AuthResponse(jwt, userDetails.getUsername()));
+        return ResponseEntity.ok(new AuthResponse(
+                jwt, 
+                user.getEmail(), 
+                user.getId(), 
+                user.getRoleType(), 
+                user.getGender()
+        ));
     }
 
     @PostMapping("/register")
@@ -64,6 +73,12 @@ public class AuthController {
         final UserDetails userDetails = userDetailsService.loadUserByUsername(savedUser.getEmail());
         final String jwt = jwtUtil.generateToken(userDetails);
 
-        return ResponseEntity.ok(new AuthResponse(jwt, userDetails.getUsername()));
+        return ResponseEntity.ok(new AuthResponse(
+                jwt, 
+                savedUser.getEmail(), 
+                savedUser.getId(), 
+                savedUser.getRoleType(), 
+                savedUser.getGender()
+        ));
     }
 }

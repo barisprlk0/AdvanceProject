@@ -102,8 +102,7 @@ export class ProfileComponent {
       next: (updatedUser: any) => {
         this.isLoading.set(false);
         this.toast.success('Profil başarıyla güncellendi.');
-        // Update local state would be better, but for now we rely on re-login or manual sync
-        // this.auth.updateCurrentUser(updatedUser); 
+        this.auth.updateCurrentUser(updatedUser); 
       },
       error: () => {
         this.isLoading.set(false);

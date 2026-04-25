@@ -28,6 +28,9 @@ export function getUserDisplayName(user: User | null): string {
 export interface AuthResponse {
   token: string;
   email: string;
+  id: number;
+  roleType: string;
+  gender?: string;
 }
 
 export interface LoginRequest {

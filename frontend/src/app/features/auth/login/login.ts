@@ -34,7 +34,7 @@ export class LoginComponent {
       });
 
       if (success) {
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/app/dashboard']);
       } else {
         this.errorMessage.set('E-posta veya şifre hatalı.');
       }

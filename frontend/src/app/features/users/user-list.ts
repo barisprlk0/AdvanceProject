@@ -41,6 +41,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton';
                 <th>Rol</th>
                 <th>Cinsiyet</th>
                 <th>Rolü Güncelle</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -63,12 +64,25 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton';
                       <option value="ADMIN">Admin</option>
                     </select>
                   </td>
+                  <td>
+                    <button class="btn-icon-sm text-danger" (click)="deleteUser(u.id)">🗑</button>
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
       }
+      
+      <div class="pagination">
+        <div class="pagination-info">
+          Toplam <strong>{{ totalElements() }}</strong> kullanıcı (Sayfa {{ currentPage() + 1 }} / {{ totalPages() }})
+        </div>
+        <div class="pagination-actions">
+          <button class="btn btn-secondary btn-sm" [disabled]="currentPage() === 0" (click)="changePage(currentPage() - 1)">Önceki</button>
+          <button class="btn btn-secondary btn-sm" [disabled]="currentPage() >= totalPages() - 1" (click)="changePage(currentPage() + 1)">Sonraki</button>
+        </div>
+      </div>
     </div>
   `,
   styles: `
@@ -80,6 +94,12 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton';
 export class UserListComponent implements OnInit {
   users = signal<User[]>([]);
   loading = signal(true);
+  
+  // Pagination
+  currentPage = signal(0);
+  pageSize = signal(30);
+  totalElements = signal(0);
+  totalPages = signal(0);
 
   constructor(private api: ApiService, private toast: ToastService) {}
 
@@ -89,10 +109,22 @@ export class UserListComponent implements OnInit {
 
   fetchUsers(): void {
     this.loading.set(true);
-    this.api.getAll<User>('users').subscribe({
-      next: (data) => { this.users.set(data); this.loading.set(false); },
+    this.api.getPage<User>('users', this.currentPage(), this.pageSize()).subscribe({
+      next: (res) => { 
+        this.users.set(res.content); 
+        this.totalElements.set(res.totalElements);
+        this.totalPages.set(res.totalPages);
+        this.loading.set(false); 
+      },
       error: () => this.loading.set(false)
     });
+  }
+
+  changePage(page: number): void {
+    if (page >= 0 && page < this.totalPages()) {
+      this.currentPage.set(page);
+      this.fetchUsers();
+    }
   }
 
   updateRole(user: User, newRole: string): void {
@@ -103,6 +135,18 @@ export class UserListComponent implements OnInit {
       },
       error: () => this.toast.error('Güncelleme başarısız.')
     });
+  }
+
+  deleteUser(id: number): void {
+    if (confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) {
+      this.api.delete('users', id).subscribe({
+        next: () => {
+          this.toast.success('Kullanıcı silindi.');
+          this.fetchUsers();
+        },
+        error: () => this.toast.error('Kullanıcı silinemedi.')
+      });
+    }
   }
 
   getRoleClass(roleType: string): string {

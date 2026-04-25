@@ -1,7 +1,8 @@
-import { Component, signal, OnInit } from '@angular/core';
+import { Component, signal, OnInit, computed } from '@angular/core';
 import { ApiService } from '../../core/services/api.service';
 import { Store, User } from '../../core/models';
 import { ToastService } from '../../core/services/toast.service';
+import { AuthService } from '../../core/services/auth.service';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton';
 import { FormsModule } from '@angular/forms';
 
@@ -13,7 +14,7 @@ import { FormsModule } from '@angular/forms';
       <div class="page-header">
         <div>
           <h1 class="page-title">Mağaza Yönetimi</h1>
-          <p class="page-subtitle">Platformdaki tüm mağazaları yönetin</p>
+          <p class="page-subtitle">@if (isAdmin()) { Platformdaki tüm mağazaları yönetin } @else { Mağazalarınızı yönetin }</p>
         </div>
         <button class="btn btn-primary btn-sm" (click)="showForm.set(true)">Yeni Mağaza</button>
       </div>
@@ -22,15 +23,24 @@ import { FormsModule } from '@angular/forms';
         <div class="card" style="margin-bottom:24px; padding:24px; animation: slideDown 0.3s ease">
           <h3 style="margin-bottom:16px">Yeni Mağaza Ekle</h3>
           <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; align-items:flex-end">
-            <div class="form-group"><label class="form-label">Mağaza Adı</label><input class="form-input" [(ngModel)]="newStore.name"></div>
-            <div class="form-group">
-              <label class="form-label">Sahibi (ID)</label>
-              <select class="form-select" [(ngModel)]="selectedOwnerId">
-                @for (u of users(); track u.id) {
-                  <option [value]="u.id">{{ u.email }}</option>
-                }
-              </select>
-            </div>
+            <div class="form-group"><label class="form-label">Mağaza Adı</label><input class="form-input" [(ngModel)]="newStore.name" placeholder="Mağaza adını girin"></div>
+            
+            @if (isAdmin()) {
+              <div class="form-group">
+                <label class="form-label">Sahibi (Admin Yetkisi)</label>
+                <select class="form-select" [(ngModel)]="selectedOwnerId">
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.email }}</option>
+                  }
+                </select>
+              </div>
+            } @else {
+              <div class="form-group">
+                <label class="form-label">Sahibi</label>
+                <input class="form-input" [value]="auth.displayName()" disabled>
+              </div>
+            }
+
             <div style="display:flex; gap:8px">
               <button class="btn btn-primary" (click)="addStore()">Kaydet</button>
               <button class="btn btn-secondary" (click)="showForm.set(false)">İptal</button>
@@ -55,18 +65,22 @@ import { FormsModule } from '@angular/forms';
                 </div>
                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px">
                    <span class="badge" [class]="store.status === 'Active' ? 'badge-success' : 'badge-danger'">{{ store.status || '—' }}</span>
-                   <select class="form-select select-xs" [value]="store.status" (change)="updateStatus(store, $any($event.target).value)">
-                     <option value="Active">Aktif</option>
-                     <option value="Inactive">Pasif</option>
-                   </select>
+                   @if (isAdmin() || store.owner.id === auth.userId()) {
+                     <select class="form-select select-xs" [value]="store.status" (change)="updateStatus(store, $any($event.target).value)">
+                       <option value="Active">Aktif</option>
+                       <option value="Inactive">Pasif</option>
+                     </select>
+                   }
                 </div>
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center">
                 <div>
                   <h4 class="store-name">{{ store.name || '—' }}</h4>
-                  <p class="store-owner">{{ store.owner?.email || '—' }}</p>
+                  <p class="store-owner">{{ store.owner.email || '—' }}</p>
                 </div>
-                <button class="btn-icon-sm text-danger" (click)="deleteStore(store.id)">🗑</button>
+                @if (isAdmin() || store.owner.id === auth.userId()) {
+                  <button class="btn-icon-sm text-danger" (click)="deleteStore(store.id)">🗑</button>
+                }
               </div>
             </div>
           }
@@ -94,11 +108,15 @@ export class StoreListComponent implements OnInit {
   newStore: any = { name: '', status: 'Active' };
   selectedOwnerId: number | null = null;
 
-  constructor(private api: ApiService, private toast: ToastService) {}
+  isAdmin = computed(() => this.auth.hasRole('ADMIN'));
+
+  constructor(private api: ApiService, private toast: ToastService, public auth: AuthService) {}
 
   ngOnInit(): void {
     this.fetchStores();
-    this.api.getAll<User>('users').subscribe(data => this.users.set(data));
+    if (this.isAdmin()) {
+      this.api.getAll<User>('users').subscribe(data => this.users.set(data));
+    }
   }
 
   fetchStores(): void {
@@ -110,20 +128,24 @@ export class StoreListComponent implements OnInit {
   }
 
   addStore(): void {
-    if (!this.newStore.name || !this.selectedOwnerId) {
-      this.toast.warning('Lütfen tüm alanları doldurun.');
+    const ownerId = this.isAdmin() ? this.selectedOwnerId : this.auth.userId();
+    
+    if (!this.newStore.name || !ownerId) {
+      this.toast.warning('Lütfen mağaza adını girin.');
       return;
     }
+
     this.api.create<Store>('stores', { 
       ...this.newStore, 
-      owner: { id: this.selectedOwnerId } 
+      owner: { id: ownerId } 
     }).subscribe({
       next: () => {
-        this.toast.success('Mağaza eklendi.');
+        this.toast.success('Mağaza başarıyla açıldı.');
         this.showForm.set(false);
+        this.newStore.name = '';
         this.fetchStores();
       },
-      error: () => this.toast.error('Hata oluştu.')
+      error: () => this.toast.error('Mağaza açılırken hata oluştu.')
     });
   }
 

@@ -1,6 +1,8 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, signal, OnInit, computed } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { Product } from '../../../core/models';
 import { CurrencyPipe } from '@angular/common';
 
@@ -11,7 +13,7 @@ import { CurrencyPipe } from '@angular/common';
     <div class="fade-in">
       <div class="page-header">
         <div class="header-with-back">
-          <button class="btn btn-ghost btn-icon" routerLink="/products">
+          <button class="btn btn-ghost btn-icon" routerLink="/app/products">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           </button>
           <div>
@@ -42,6 +44,19 @@ import { CurrencyPipe } from '@angular/common';
                 <span class="price-value">{{ product()?.unitPrice | currency:'TRY':'symbol':'1.2-2':'tr-TR' }}</span>
               </div>
               <p class="product-desc">{{ product()?.description }}</p>
+
+              @if (isIndividual()) {
+                <div class="product-actions" style="margin-top: 32px">
+                  <button class="btn btn-primary btn-lg" style="width: 100%; height: 54px; font-size: 1.1rem" (click)="placeOrder()" [disabled]="orderLoading()">
+                    @if (orderLoading()) {
+                      <span class="spinner spinner-sm"></span> İşleniyor...
+                    } @else {
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                      Hemen Sipariş Ver
+                    }
+                  </button>
+                </div>
+              }
             </div>
           </div>
 
@@ -97,8 +112,17 @@ export class ProductDetailComponent implements OnInit {
   productId: string = '';
   product = signal<Product | null>(null);
   loading = signal(true);
+  orderLoading = signal(false);
 
-  constructor(private route: ActivatedRoute, private api: ApiService) {}
+  isIndividual = computed(() => this.auth.hasRole('INDIVIDUAL'));
+
+  constructor(
+    private route: ActivatedRoute, 
+    private router: Router,
+    private api: ApiService,
+    private auth: AuthService,
+    private toast: ToastService
+  ) {}
 
   ngOnInit(): void {
     this.productId = this.route.snapshot.paramMap.get('id') || '';
@@ -111,5 +135,40 @@ export class ProductDetailComponent implements OnInit {
         error: () => this.loading.set(false)
       });
     }
+  }
+
+  placeOrder(): void {
+    const product = this.product();
+    if (!product) return;
+
+    this.orderLoading.set(true);
+    
+    // Create a simple order
+    const orderData = {
+      orderDate: new Date().toISOString(),
+      status: 'Pending',
+      grandTotal: product.unitPrice,
+      user: { id: this.auth.userId() },
+      store: { id: product.store?.id },
+      items: [
+        {
+          product: { id: product.id },
+          quantity: 1,
+          price: product.unitPrice
+        }
+      ]
+    };
+
+    this.api.create('orders', orderData).subscribe({
+      next: () => {
+        this.orderLoading.set(false);
+        this.toast.success('Siparişiniz başarıyla oluşturuldu!');
+        setTimeout(() => this.router.navigate(['/app/orders']), 1500);
+      },
+      error: () => {
+        this.orderLoading.set(false);
+        this.toast.error('Sipariş oluşturulurken bir hata oluştu.');
+      }
+    });
   }
 }

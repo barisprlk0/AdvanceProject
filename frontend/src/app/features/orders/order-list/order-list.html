@@ -39,7 +39,7 @@
       </thead>
       <tbody>
         @for (order of orders(); track order.id) {
-          <tr [routerLink]="['/orders', order.id]" class="clickable-row">
+          <tr [routerLink]="['/app/orders', order.id]" class="clickable-row">
             <td><span class="order-id">#{{ order.id }}</span></td>
             <td>
               <div class="customer-cell">
@@ -58,12 +58,21 @@
             <td><span class="badge" [class]="'badge-' + order.statusKey">{{ order.status }}</span></td>
             <td class="text-muted text-sm">{{ order.date }}</td>
             <td>
-              <select class="form-select status-select" (change)="updateOrderStatus(order, $any($event.target).value, $event)" (click)="$event.stopPropagation()">
-                <option [selected]="order.status === 'Processing'" value="Processing">Hazırlanıyor</option>
-                <option [selected]="order.status === 'Shipped'" value="Shipped">Kargoda</option>
-                <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
-                <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
-              </select>
+              @if (auth.hasRole('ADMIN')) {
+                <select class="form-select status-select" (change)="updateOrderStatus(order, $any($event.target).value, $event)" (click)="$event.stopPropagation()">
+                  <option [selected]="order.status === 'Pending'" value="Pending">Bekliyor</option>
+                  <option [selected]="order.status === 'Processing'" value="Processing">Hazırlanıyor</option>
+                  <option [selected]="order.status === 'Shipped'" value="Shipped">Kargoda</option>
+                  <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
+                  <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
+                </select>
+              } @else if (auth.hasRole('CORPORATE') && order.status !== 'Shipped' && order.status !== 'Delivered') {
+                <button class="btn btn-primary btn-sm" (click)="shipOrder(order, $event)">
+                  Kargoya Ver
+                </button>
+              } @else {
+                <span class="text-muted text-sm">—</span>
+              }
             </td>
           </tr>
         }
@@ -72,7 +81,11 @@
   </div>
 
   <!-- Pagination -->
-  <div class="pagination">
-    <span class="pagination-info">Toplam {{ orders().length }} sipariş</span>
-  </div>
+  <app-pagination 
+    [page]="currentPage()" 
+    [size]="pageSize()" 
+    [totalElements]="totalElements()" 
+    [totalPages]="totalPages()"
+    (pageChange)="onPageChange($event)">
+  </app-pagination>
 </div>

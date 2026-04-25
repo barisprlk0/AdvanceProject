@@ -3,19 +3,20 @@ import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
-  // Auth routes
+  // Auth routes (Login & Register)
   {
     path: '',
     loadComponent: () => import('./layouts/auth-layout/auth-layout').then(m => m.AuthLayoutComponent),
     children: [
       { path: 'login', loadComponent: () => import('./features/auth/login/login').then(m => m.LoginComponent) },
       { path: 'register', loadComponent: () => import('./features/auth/register/register').then(m => m.RegisterComponent) },
+      { path: '', redirectTo: 'login', pathMatch: 'full' }
     ]
   },
 
   // Main app routes
   {
-    path: '',
+    path: 'app',
     loadComponent: () => import('./layouts/main-layout/main-layout').then(m => m.MainLayoutComponent),
     canActivate: [authGuard],
     children: [
@@ -24,9 +25,9 @@ export const routes: Routes = [
       { path: 'orders/:id', loadComponent: () => import('./features/orders/order-detail/order-detail').then(m => m.OrderDetailComponent) },
       { path: 'products', loadComponent: () => import('./features/products/product-list/product-list').then(m => m.ProductListComponent) },
       { path: 'products/:id', loadComponent: () => import('./features/products/product-detail/product-detail').then(m => m.ProductDetailComponent) },
-      { path: 'reviews', loadComponent: () => import('./features/reviews/reviews').then(m => m.ReviewsComponent) },
+      { path: 'reviews', loadComponent: () => import('./features/reviews/reviews').then(m => m.ReviewsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'CORPORATE'] } },
       { path: 'shipments', loadComponent: () => import('./features/shipments/shipments').then(m => m.ShipmentsComponent) },
-      { path: 'analytics', loadComponent: () => import('./features/analytics/analytics').then(m => m.AnalyticsComponent) },
+      { path: 'analytics', loadComponent: () => import('./features/analytics/analytics').then(m => m.AnalyticsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'CORPORATE'] } },
       { path: 'chatbot', loadComponent: () => import('./features/chatbot/chatbot').then(m => m.ChatbotComponent) },
       { path: 'profile', loadComponent: () => import('./features/profile/profile').then(m => m.ProfileComponent) },
 
@@ -41,7 +42,7 @@ export const routes: Routes = [
         path: 'stores',
         loadComponent: () => import('./features/stores/store-list').then(m => m.StoreListComponent),
         canActivate: [roleGuard],
-        data: { roles: ['ADMIN'] }
+        data: { roles: ['ADMIN', 'CORPORATE'] }
       },
       {
         path: 'categories',
@@ -49,10 +50,11 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: ['ADMIN'] }
       },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },
 
-  // Redirects
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
-  { path: '**', redirectTo: '/dashboard' },
+  // Final redirects
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: '**', redirectTo: 'app/dashboard' },
 ];

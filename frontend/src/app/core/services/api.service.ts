@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { PageResponse } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -19,7 +19,19 @@ export class ApiService {
         }
       });
     }
-    return this.http.get<T[]>(`${this.baseUrl}/${endpoint}`, { params: httpParams });
+    // If we want ALL records, we might want to send a large size if the backend is paginated
+    if (!httpParams.has('size')) {
+      httpParams = httpParams.set('size', '1000');
+    }
+
+    return this.http.get<any>(`${this.baseUrl}/${endpoint}`, { params: httpParams }).pipe(
+      map(res => {
+        if (res && res.content && Array.isArray(res.content)) {
+          return res.content;
+        }
+        return Array.isArray(res) ? res : [];
+      })
+    );
   }
 
   /**

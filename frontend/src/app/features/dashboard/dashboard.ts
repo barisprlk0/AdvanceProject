@@ -98,14 +98,22 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       setTimeout(() => this.initRevenueChart(), 100);
     });
 
-    this.api.getAll<any>('users').subscribe(users => {
-      const customerCount = users.filter((u: any) => u.roleType?.toLowerCase() !== 'admin').length;
+    if (this.isAdmin()) {
+      this.api.getAll<any>('users').subscribe(users => {
+        const customerCount = users.filter((u: any) => u.roleType?.toLowerCase() !== 'admin').length;
+        this.stats.update(s => {
+          const copy = [...s];
+          copy[2] = { ...copy[2], value: customerCount.toLocaleString('tr-TR'), change: `${users.length} toplam kullanıcı`, positive: true };
+          return copy;
+        });
+      });
+    } else {
       this.stats.update(s => {
         const copy = [...s];
-        copy[2] = { ...copy[2], value: customerCount.toLocaleString('tr-TR'), change: `${users.length} toplam kullanıcı`, positive: true };
+        copy[2] = { ...copy[2], value: 'N/A', change: 'Erişim yetkisi yok', positive: false };
         return copy;
       });
-    });
+    }
 
     this.api.getAll<Category>('categories').subscribe(cats => {
       this.categories = cats;

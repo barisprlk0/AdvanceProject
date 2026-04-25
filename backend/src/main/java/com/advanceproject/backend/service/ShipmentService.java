@@ -3,6 +3,8 @@ package com.advanceproject.backend.service;
 import com.advanceproject.backend.entity.Shipment;
 import com.advanceproject.backend.repository.ShipmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +30,32 @@ public class ShipmentService {
 
     public List<Shipment> getAllShipments() {
         return shipmentRepository.findAll();
+    }
+
+    public Page<Shipment> getAllShipments(Pageable pageable) {
+        return shipmentRepository.findAll(pageable);
+    }
+
+    public Page<Shipment> getShipmentsByUserId(Integer userId, Pageable pageable) {
+        return shipmentRepository.findByOrderUserId(userId, pageable);
+    }
+
+    public Page<Shipment> getShipmentsByStoreOwnerId(Integer ownerId, Pageable pageable) {
+        return shipmentRepository.findByOrderStoreOwnerId(ownerId, pageable);
+    }
+
+    public List<Shipment> getShipmentsByStoreOwnerId(Integer ownerId) {
+        return shipmentRepository.findByOrderStoreOwnerId(ownerId);
+    }
+
+    public Shipment patchShipment(Integer id, Shipment partialShipment) {
+        return shipmentRepository.findById(id).map(shipment -> {
+            if (partialShipment.getWarehouse() != null) shipment.setWarehouse(partialShipment.getWarehouse());
+            if (partialShipment.getMode() != null) shipment.setMode(partialShipment.getMode());
+            if (partialShipment.getStatus() != null) shipment.setStatus(partialShipment.getStatus());
+            if (partialShipment.getOrder() != null) shipment.setOrder(partialShipment.getOrder());
+            return shipmentRepository.save(shipment);
+        }).orElseThrow(() -> new RuntimeException("Shipment not found"));
     }
 
     public Shipment updateShipment(Integer id, Shipment updatedShipment) {

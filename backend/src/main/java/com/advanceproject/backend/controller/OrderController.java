@@ -1,9 +1,16 @@
 package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.entity.Order;
+import com.advanceproject.backend.entity.Shipment;
+import com.advanceproject.backend.entity.User;
 import com.advanceproject.backend.service.OrderService;
+import com.advanceproject.backend.service.ShipmentService;
+import com.advanceproject.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,28 +20,51 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final UserService userService;
+    private final ShipmentService shipmentService;
 
     @Autowired
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, UserService userService, ShipmentService shipmentService) {
         this.orderService = orderService;
+        this.userService = userService;
+        this.shipmentService = shipmentService;
     }
 
     @PostMapping
     public ResponseEntity<Order> createOrder(@RequestBody Order order) {
-        // Sipariş kalemi listesini şimdilik null gönderiyoruz, ileride DTO'ya geçirilecek
-        return ResponseEntity.ok(orderService.createOrder(order.getUser(), order.getStore(), null, order.getPaymentMethod()));
+        return ResponseEntity.ok(orderService.createOrder(order));
     }
 
     @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    public ResponseEntity<Page<Order>> getAllOrders(Pageable pageable, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if ("ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            return ResponseEntity.ok(orderService.getAllOrders(pageable));
+        } else if ("CORPORATE".equalsIgnoreCase(user.getRoleType())) {
+            // Corporate users see orders coming to their stores
+            return ResponseEntity.ok(orderService.getOrdersByStoreOwnerId(user.getId(), pageable));
+        } else {
+            // Individual users see their own purchases
+            return ResponseEntity.ok(orderService.getOrdersByUserId(user.getId(), pageable));
+        }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getOrderById(@PathVariable Integer id) {
-        return orderService.getOrderById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Order> getOrderById(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Order order = orderService.getOrderById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // Admin can see everything, others only their own
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !order.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        return ResponseEntity.ok(order);
     }
 
     @PutMapping("/{id}")
@@ -42,9 +72,42 @@ public class OrderController {
         return ResponseEntity.ok(orderService.updateOrder(id, order));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<Order> patchOrder(@PathVariable Integer id, @RequestBody Order partialOrder) {
+        return ResponseEntity.ok(orderService.patchOrder(id, partialOrder));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/ship")
+    public ResponseEntity<Order> shipOrder(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Order order = orderService.getOrderById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // Only store owner or ADMIN can ship
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !order.getStore().getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        // Update status
+        order.setStatus("Shipped");
+        Order updatedOrder = orderService.updateOrder(id, order);
+
+        // Auto-create shipment
+        Shipment shipment = new Shipment();
+        shipment.setOrder(updatedOrder);
+        shipment.setStatus("In Transit");
+        shipment.setMode("Express");
+        shipment.setWarehouse("Main Store");
+        shipmentService.createShipment(shipment);
+
+        return ResponseEntity.ok(updatedOrder);
     }
 }

@@ -4,10 +4,12 @@
       <h1 class="page-title">Ürünler</h1>
       <p class="page-subtitle">Toplam {{ totalElements() }} ürün listeleniyor</p>
     </div>
-    <button class="btn btn-primary btn-sm" (click)="openAddForm()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Yeni Ürün
-    </button>
+    @if (canManageProducts()) {
+      <button class="btn btn-primary btn-sm" (click)="openAddForm()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Yeni Ürün
+      </button>
+    }
   </div>
 
   <!-- Filters -->
@@ -61,7 +63,7 @@
     @if (viewMode() === 'grid') {
       <div class="product-grid">
         @for (product of products(); track product.id; let i = $index) {
-          <div class="product-card clickable" [style.animation-delay]="(i * 50) + 'ms'" [routerLink]="['/products', product.id]">
+          <div class="product-card clickable" [style.animation-delay]="(i * 50) + 'ms'" [routerLink]="['/app/products', product.id]">
             <div class="product-image">
               <div class="product-placeholder" [style.background]="'hsl(' + (product.id * 37 % 360) + ', 45%, 92%)'">
                 <span [style.color]="'hsl(' + (product.id * 37 % 360) + ', 55%, 45%)'">{{ getInitials(getDisplayName(product)) }}</span>
@@ -72,10 +74,12 @@
               <span class="product-cat">{{ product.category?.name || '—' }}</span>
               <div style="display:flex; justify-content:space-between; align-items:flex-start">
                 <h4 class="product-name">{{ getDisplayName(product) }}</h4>
-                <div class="card-actions">
-                  <button class="btn-icon-sm" (click)="openEditForm(product, $event)">✎</button>
-                  <button class="btn-icon-sm text-danger" (click)="deleteProduct(product.id, $event)">🗑</button>
-                </div>
+                @if (canManageProducts()) {
+                  <div class="card-actions">
+                    <button class="btn-icon-sm" (click)="openEditForm(product, $event)">✎</button>
+                    <button class="btn-icon-sm text-danger" (click)="deleteProduct(product.id, $event)">🗑</button>
+                  </div>
+                }
               </div>
               <div class="product-footer">
                 <span class="product-price">₺{{ (product.unitPrice || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2}) }}</span>
@@ -103,7 +107,7 @@
           </thead>
           <tbody>
             @for (product of products(); track product.id) {
-              <tr [routerLink]="['/products', product.id]" class="clickable-row">
+              <tr [routerLink]="['/app/products', product.id]" class="clickable-row">
                 <td>
                   <div class="table-product">
                     <div class="table-product-img" [style.background]="'hsl(' + (product.id * 37 % 360) + ', 45%, 92%)'">
@@ -117,10 +121,12 @@
                 <td class="font-medium">₺{{ (product.unitPrice || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2}) }}</td>
                 <td class="text-muted">{{ product.store?.name || '—' }}</td>
                 <td>
-                  <div class="table-actions">
-                    <button class="btn btn-ghost btn-icon-sm" (click)="openEditForm(product, $event)">✎</button>
-                    <button class="btn btn-ghost btn-icon-sm text-danger" (click)="deleteProduct(product.id, $event)">🗑</button>
-                  </div>
+                  @if (canManageProducts()) {
+                    <div class="table-actions">
+                      <button class="btn btn-ghost btn-icon-sm" (click)="openEditForm(product, $event)">✎</button>
+                      <button class="btn btn-ghost btn-icon-sm text-danger" (click)="deleteProduct(product.id, $event)">🗑</button>
+                    </div>
+                  }
                 </td>
               </tr>
             }
