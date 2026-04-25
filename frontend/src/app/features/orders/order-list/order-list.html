@@ -15,7 +15,7 @@
   <!-- Tabs -->
   <div class="order-tabs">
     @for (tab of tabs(); track tab.key) {
-      <button class="order-tab" [class.active]="activeTab() === tab.key" (click)="activeTab.set(tab.key)">
+      <button class="order-tab" [class.active]="activeTab() === tab.key" (click)="setActiveTab(tab.key)">
         {{ tab.label }}
         <span class="tab-count">{{ tab.count }}</span>
       </button>
@@ -66,7 +66,7 @@
                   <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
                   <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
                 </select>
-              } @else if (auth.hasRole('CORPORATE') && order.status !== 'Shipped' && order.status !== 'Delivered') {
+              } @else if (auth.hasRole('CORPORATE') && !isFinalStatus(order.rawStatus) && order.rawStatus !== 'Shipped') {
                 <button class="btn btn-primary btn-sm" (click)="shipOrder(order, $event)">
                   Kargoya Ver
                 </button>

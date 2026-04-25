@@ -40,6 +40,37 @@ public class ProductService {
         return productRepository.findByStoreOwnerId(ownerId, pageable);
     }
 
+    public Page<Product> searchProducts(String search, String category, Integer ownerId, Pageable pageable) {
+        String normalizedSearch = normalizeFilter(search);
+        String normalizedCategory = normalizeFilter(category);
+
+        if (normalizedSearch == null && normalizedCategory == null) {
+            return ownerId == null
+                    ? productRepository.findAll(pageable)
+                    : productRepository.findByStoreOwnerId(ownerId, pageable);
+        }
+
+        if (normalizedSearch == null) {
+            return ownerId == null
+                    ? productRepository.findByCategoryNameIgnoreCase(normalizedCategory, pageable)
+                    : productRepository.findByStoreOwnerIdAndCategoryNameIgnoreCase(ownerId, normalizedCategory, pageable);
+        }
+
+        return productRepository.searchProducts(normalizedSearch, normalizedCategory, ownerId, pageable);
+    }
+
+    public Product patchProduct(Integer id, Product partialProduct) {
+        return productRepository.findById(id).map(product -> {
+            if (partialProduct.getName() != null) product.setName(partialProduct.getName());
+            if (partialProduct.getSku() != null) product.setSku(partialProduct.getSku());
+            if (partialProduct.getDescription() != null) product.setDescription(partialProduct.getDescription());
+            if (partialProduct.getUnitPrice() != null) product.setUnitPrice(partialProduct.getUnitPrice());
+            if (partialProduct.getCategory() != null) product.setCategory(partialProduct.getCategory());
+            if (partialProduct.getStore() != null) product.setStore(partialProduct.getStore());
+            return productRepository.save(product);
+        }).orElseThrow(() -> new RuntimeException("Product not found"));
+    }
+
     public Product updateProduct(Integer id, Product updatedProduct) {
         return productRepository.findById(id).map(product -> {
             product.setName(updatedProduct.getName());
@@ -54,5 +85,12 @@ public class ProductService {
 
     public void deleteProduct(Integer id) {
         productRepository.deleteById(id);
+    }
+
+    private String normalizeFilter(String value) {
+        if (value == null || value.isBlank() || "all".equalsIgnoreCase(value)) {
+            return null;
+        }
+        return value.trim().toLowerCase();
     }
 }

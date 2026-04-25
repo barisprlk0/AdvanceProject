@@ -73,6 +73,25 @@ public class StoreController {
         return ResponseEntity.ok(storeService.updateStore(id, store));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<Store> patchStore(@PathVariable Integer id, @RequestBody Store store, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Store existingStore = storeService.getStoreById(id)
+                .orElseThrow(() -> new RuntimeException("Store not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !existingStore.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            store.setOwner(existingStore.getOwner());
+        }
+
+        return ResponseEntity.ok(storeService.patchStore(id, store));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteStore(@PathVariable Integer id, Authentication authentication) {
         User user = userService.getUserByEmail(authentication.getName())

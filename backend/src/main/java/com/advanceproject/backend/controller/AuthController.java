@@ -41,14 +41,17 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+        String email = loginRequest.getEmail().trim().toLowerCase();
+        String password = loginRequest.getPassword().trim();
+
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(email, password)
         );
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.getEmail());
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(email);
         final String jwt = jwtUtil.generateToken(userDetails);
         
-        User user = userService.getUserByEmail(loginRequest.getEmail())
+        User user = userService.getUserByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found after authentication"));
 
         return ResponseEntity.ok(new AuthResponse(
@@ -62,9 +65,16 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        String email = registerRequest.getEmail().trim().toLowerCase();
+        String password = registerRequest.getPassword().trim();
+
+        if (userService.getUserByEmail(email).isPresent()) {
+            throw new RuntimeException("Bu e-posta adresi zaten kayitli.");
+        }
+
         User newUser = new User();
-        newUser.setEmail(registerRequest.getEmail());
-        newUser.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
+        newUser.setEmail(email);
+        newUser.setPasswordHash(passwordEncoder.encode(password));
         newUser.setRoleType(registerRequest.getRoleType() != null ? registerRequest.getRoleType() : "Individual");
         newUser.setGender(registerRequest.getGender());
 

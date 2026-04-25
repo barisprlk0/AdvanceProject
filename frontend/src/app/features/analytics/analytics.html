@@ -1,78 +1,173 @@
 <div class="analytics-page fade-in">
   <div class="page-header">
     <div>
-      <h1 class="page-title">Analitik</h1>
-      <p class="page-subtitle">Gerçek zamanlı performans analizi ve raporları</p>
+      <h1 class="page-title">Admin Analitik</h1>
+      <p class="page-subtitle">Platform geneli gelir, kullanıcı, mağaza ve memnuniyet analizi</p>
     </div>
     <div class="header-actions">
-      <div class="date-range">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Tüm Zamanlar
-      </div>
-      <button class="btn btn-primary btn-sm">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Rapor İndir
-      </button>
+      <button class="btn btn-secondary btn-sm" routerLink="/app/users">Kullanıcılar</button>
+      <button class="btn btn-primary btn-sm" routerLink="/app/stores">Mağazalar</button>
     </div>
   </div>
 
   @if (loading()) {
-    <div class="card" style="text-align: center; padding: 60px;">
+    <div class="card analytics-loading">
       <span class="spinner"></span>
-      <p style="margin-top: 15px; color: var(--text-muted);">Analiz verileri yükleniyor...</p>
+      <p>Analiz verileri yükleniyor...</p>
     </div>
   } @else {
-    <!-- KPI Cards -->
     <div class="kpi-grid">
       @for (kpi of kpis(); track kpi.label) {
-        <div class="kpi-card">
+        <div class="kpi-card" [attr.data-tone]="kpi.tone">
           <div class="kpi-label">{{ kpi.label }}</div>
           <div class="kpi-value">{{ kpi.value }}</div>
-          <div class="kpi-change" [class.positive]="kpi.positive" [class.negative]="!kpi.positive">
-             {{ kpi.change }}
-          </div>
+          <div class="kpi-detail">{{ kpi.detail }}</div>
         </div>
       }
     </div>
 
-    <!-- Charts Grid -->
+    <div class="data-scope">
+      Analiz kapsamı: backend sayfaları 2000 kayıtlık parçalar halinde tamamen okunur; KPI ve grafikler yüklenen gerçek kayıtlarla hesaplanır.
+    </div>
+
     <div class="charts-grid">
-      <div class="card chart-card">
+      <section class="card chart-card-wide">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Haftalık Satış Trendi</h3>
-            <p class="card-subtitle">Günlük toplam satış verileri</p>
+            <h3 class="card-title">Aylık Gelir Performansı</h3>
+            <p class="card-subtitle">Toplam gelir ve teslim edilen sipariş geliri</p>
           </div>
         </div>
-        <div class="chart-wrapper"><canvas #salesChart></canvas></div>
-      </div>
-      <div class="card chart-card">
+        <div class="chart-wrapper-lg"><canvas #revenueChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Sipariş Sayıları</h3>
-            <p class="card-subtitle">Günlük sipariş adetleri</p>
+            <h3 class="card-title">Sipariş Durumları</h3>
+            <p class="card-subtitle">Kargo durumu öncelikli</p>
           </div>
         </div>
-        <div class="chart-wrapper"><canvas #ordersChart></canvas></div>
-      </div>
-      <div class="card chart-card-wide">
+        <div class="chart-wrapper-sm"><canvas #statusChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Aylık Finansal Performans</h3>
-            <p class="card-subtitle">Gelir & Gider (Tahmini) Karşılaştırması</p>
+            <h3 class="card-title">Kullanıcı Rolleri</h3>
+            <p class="card-subtitle">Admin, kurumsal ve müşteri dağılımı</p>
           </div>
         </div>
-        <div class="chart-wrapper-lg"><canvas #revenueExpenseChart></canvas></div>
-      </div>
-      <div class="card chart-card-small">
+        <div class="chart-wrapper-sm"><canvas #roleChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">Müşteri Duyarlılığı</h3>
-            <p class="card-subtitle">Yorum sentiment analizi</p>
+            <h3 class="card-title">Puan Dağılımı</h3>
+            <p class="card-subtitle">Ürün yorum yıldızları</p>
           </div>
         </div>
-        <div class="chart-wrapper-sm"><canvas #segmentChart></canvas></div>
-      </div>
+        <div class="chart-wrapper-sm"><canvas #ratingChart></canvas></div>
+      </section>
+    </div>
+
+    <div class="tables-grid">
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Mağaza Performansı</h3>
+            <p class="card-subtitle">Gelire göre ilk mağazalar</p>
+          </div>
+        </div>
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>Mağaza</th>
+              <th>Sahip</th>
+              <th>Ürün</th>
+              <th>Sipariş</th>
+              <th>Gelir</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (store of topStores(); track store.id) {
+              <tr>
+                <td><strong>{{ store.name }}</strong><span class="row-sub">{{ store.status }}</span></td>
+                <td>{{ store.owner }}</td>
+                <td>{{ store.products }}</td>
+                <td>{{ store.orders }}</td>
+                <td class="font-medium">{{ store.revenue }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="empty-cell">Mağaza verisi yok.</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Kategori Performansı</h3>
+            <p class="card-subtitle">Ürün, satış ve gelir kırılımı</p>
+          </div>
+        </div>
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>Kategori</th>
+              <th>Ürün</th>
+              <th>Satış</th>
+              <th>Gelir</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (category of categoryRows(); track category.name) {
+              <tr>
+                <td><strong>{{ category.name }}</strong></td>
+                <td>{{ category.products }}</td>
+                <td>{{ category.orders }}</td>
+                <td class="font-medium">{{ category.revenue }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="empty-cell">Kategori verisi yok.</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <div class="bottom-grid">
+      <section class="card">
+        <h3 class="card-title">Durum Özeti</h3>
+        <div class="status-list">
+          @for (row of orderStatusRows(); track row.label) {
+            <div class="status-row">
+              <span class="badge" [class]="'badge-' + row.className">{{ row.label }}</span>
+              <div class="status-track"><div [style.width]="row.percent + '%'"></div></div>
+              <strong>{{ row.count }}</strong>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="card-title">Son Yorumlar</h3>
+        <div class="review-list">
+          @for (review of recentReviews(); track review.id) {
+            <article class="review-item">
+              <div>
+                <strong>{{ productName(review) }}</strong>
+                <span>{{ userName(review) }} · {{ stars(reviewRating(review)) }}</span>
+              </div>
+              <p>{{ review.sentiment || 'Yorum metni yok.' }}</p>
+            </article>
+          } @empty {
+            <div class="empty-cell">Yorum bulunamadı.</div>
+          }
+        </div>
+      </section>
     </div>
   }
 </div>

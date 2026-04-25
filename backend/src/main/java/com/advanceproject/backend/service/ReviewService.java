@@ -36,12 +36,35 @@ public class ReviewService {
         return reviewRepository.findByProductStoreOwnerId(ownerId);
     }
 
+    public List<Review> getReviewsByUserId(Integer userId) {
+        return reviewRepository.findByUserId(userId);
+    }
+
     public Page<Review> getAllReviews(Pageable pageable) {
         return reviewRepository.findAll(pageable);
     }
 
     public Page<Review> getReviewsByOwnerId(Integer ownerId, Pageable pageable) {
         return reviewRepository.findByProductStoreOwnerId(ownerId, pageable);
+    }
+
+    public Page<Review> getReviewsByUserId(Integer userId, Pageable pageable) {
+        return reviewRepository.findByUserId(userId, pageable);
+    }
+
+    public Page<Review> getReviewsByProductId(Integer productId, Pageable pageable) {
+        return reviewRepository.findByProductId(productId, pageable);
+    }
+
+    public Review patchReview(Integer id, Review partialReview) {
+        return reviewRepository.findById(id).map(review -> {
+            if (partialReview.getStarRating() != null) review.setStarRating(partialReview.getStarRating());
+            if (partialReview.getHelpfulnessVotes() != null) review.setHelpfulnessVotes(partialReview.getHelpfulnessVotes());
+            if (partialReview.getSentiment() != null) review.setSentiment(partialReview.getSentiment());
+            if (partialReview.getProduct() != null) review.setProduct(partialReview.getProduct());
+            if (partialReview.getUser() != null) review.setUser(partialReview.getUser());
+            return reviewRepository.save(review);
+        }).orElseThrow(() -> new RuntimeException("Review not found"));
     }
 
     public Review updateReview(Integer id, Review updatedReview) {

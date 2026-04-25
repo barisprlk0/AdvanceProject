@@ -69,6 +69,10 @@ export class ApiService {
     return this.http.patch<T>(`${this.baseUrl}/${endpoint}/${id}`, body);
   }
 
+  patchEndpoint<T>(endpoint: string, body: unknown): Observable<T> {
+    return this.http.patch<T>(`${this.baseUrl}/${endpoint}`, body);
+  }
+
   delete(endpoint: string, id: number | string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${endpoint}/${id}`);
   }

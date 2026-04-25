@@ -47,7 +47,18 @@ public class StoreService {
         return storeRepository.findById(id).map(store -> {
             store.setName(updatedStore.getName());
             store.setStatus(updatedStore.getStatus());
-            store.setOwner(updatedStore.getOwner());
+            if (updatedStore.getOwner() != null) {
+                store.setOwner(updatedStore.getOwner());
+            }
+            return storeRepository.save(store);
+        }).orElseThrow(() -> new RuntimeException("Store not found"));
+    }
+
+    public Store patchStore(Integer id, Store partialStore) {
+        return storeRepository.findById(id).map(store -> {
+            if (partialStore.getName() != null) store.setName(partialStore.getName());
+            if (partialStore.getStatus() != null) store.setStatus(partialStore.getStatus());
+            if (partialStore.getOwner() != null) store.setOwner(partialStore.getOwner());
             return storeRepository.save(store);
         }).orElseThrow(() -> new RuntimeException("Store not found"));
     }

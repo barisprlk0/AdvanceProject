@@ -94,8 +94,7 @@ export class ProfileComponent {
     if (!user) return;
 
     this.isLoading.set(true);
-    this.api.update('users', user.id, {
-      ...user,
+    this.api.patchEndpoint('users/profile', {
       email: this.email,
       gender: this.gender
     }).subscribe({

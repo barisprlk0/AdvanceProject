@@ -21,17 +21,21 @@ export class RegisterComponent {
   constructor(private auth: AuthService, private router: Router) {}
 
   async onSubmit(): Promise<void> {
-    if (!this.email() || !this.password()) {
+    const email = this.email().trim().toLowerCase();
+    const password = this.password().trim();
+    const confirmPassword = this.confirmPassword().trim();
+
+    if (!email || !password) {
       this.errorMessage.set('Lütfen tüm alanları doldurun.');
       return;
     }
 
-    if (this.password() !== this.confirmPassword()) {
+    if (password !== confirmPassword) {
       this.errorMessage.set('Şifreler eşleşmiyor.');
       return;
     }
 
-    if (this.password().length < 6) {
+    if (password.length < 6) {
       this.errorMessage.set('Şifre en az 6 karakter olmalıdır.');
       return;
     }
@@ -41,8 +45,8 @@ export class RegisterComponent {
 
     try {
       const success = await this.auth.register({
-        email: this.email(),
-        password: this.password(),
+        email,
+        password,
         roleType: this.roleType(),
         gender: this.gender() || undefined
       });
@@ -52,8 +56,8 @@ export class RegisterComponent {
       } else {
         this.errorMessage.set('Kayıt oluşturulamadı.');
       }
-    } catch {
-      this.errorMessage.set('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } catch (error: any) {
+      this.errorMessage.set(error?.error?.error || error?.error?.message || 'Kayıt oluşturulamadı.');
     } finally {
       this.isLoading.set(false);
     }

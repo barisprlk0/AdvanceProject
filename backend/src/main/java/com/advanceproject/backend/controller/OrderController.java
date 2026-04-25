@@ -59,8 +59,7 @@ public class OrderController {
         Order order = orderService.getOrderById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        // Admin can see everything, others only their own
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !order.getUser().getId().equals(user.getId())) {
+        if (!canAccessOrder(user, order)) {
             return ResponseEntity.status(403).build();
         }
         
@@ -68,17 +67,47 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Order> updateOrder(@PathVariable Integer id, @RequestBody Order order) {
+    public ResponseEntity<Order> updateOrder(@PathVariable Integer id, @RequestBody Order order, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Order existingOrder = orderService.getOrderById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!canManageOrder(user, existingOrder)) {
+            return ResponseEntity.status(403).build();
+        }
+
         return ResponseEntity.ok(orderService.updateOrder(id, order));
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<Order> patchOrder(@PathVariable Integer id, @RequestBody Order partialOrder) {
+    public ResponseEntity<Order> patchOrder(@PathVariable Integer id, @RequestBody Order partialOrder, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Order existingOrder = orderService.getOrderById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!canManageOrder(user, existingOrder)) {
+            return ResponseEntity.status(403).build();
+        }
+
         return ResponseEntity.ok(orderService.patchOrder(id, partialOrder));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {
+    public ResponseEntity<Void> deleteOrder(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Order existingOrder = orderService.getOrderById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!canManageOrder(user, existingOrder)) {
+            return ResponseEntity.status(403).build();
+        }
+
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();
     }
@@ -109,5 +138,25 @@ public class OrderController {
         shipmentService.createShipment(shipment);
 
         return ResponseEntity.ok(updatedOrder);
+    }
+
+    private boolean canAccessOrder(User user, Order order) {
+        if ("ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            return true;
+        }
+        if ("CORPORATE".equalsIgnoreCase(user.getRoleType())) {
+            return order.getStore() != null
+                    && order.getStore().getOwner() != null
+                    && order.getStore().getOwner().getId().equals(user.getId());
+        }
+        return order.getUser() != null && order.getUser().getId().equals(user.getId());
+    }
+
+    private boolean canManageOrder(User user, Order order) {
+        return "ADMIN".equalsIgnoreCase(user.getRoleType())
+                || ("CORPORATE".equalsIgnoreCase(user.getRoleType())
+                && order.getStore() != null
+                && order.getStore().getOwner() != null
+                && order.getStore().getOwner().getId().equals(user.getId()));
     }
 }

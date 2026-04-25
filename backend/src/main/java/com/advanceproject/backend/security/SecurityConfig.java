@@ -51,6 +51,8 @@ public class SecurityConfig {
                         
                         // User restrictions
                         .requestMatchers(HttpMethod.GET, "/api/users/profile").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/users/profile").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/users/profile").authenticated()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         
                         // Category restrictions
@@ -68,8 +70,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/reviews/**").hasRole("ADMIN")
                         
                         // Order & Shipment status updates
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/**").hasAnyRole("ADMIN", "CORPORATE")
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/**").hasAnyRole("ADMIN", "CORPORATE")
+                        .requestMatchers(HttpMethod.DELETE, "/api/orders/**").hasAnyRole("ADMIN", "CORPORATE")
+                        .requestMatchers(HttpMethod.PUT, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
                         .requestMatchers(HttpMethod.PATCH, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
+                        .requestMatchers(HttpMethod.DELETE, "/api/shipments/**").hasAnyRole("ADMIN", "CORPORATE")
                         
                         .anyRequest().authenticated()
                 )

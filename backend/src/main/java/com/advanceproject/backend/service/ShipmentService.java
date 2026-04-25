@@ -40,6 +40,10 @@ public class ShipmentService {
         return shipmentRepository.findByOrderUserId(userId, pageable);
     }
 
+    public List<Shipment> getShipmentsByUserId(Integer userId) {
+        return shipmentRepository.findByOrderUserId(userId);
+    }
+
     public Page<Shipment> getShipmentsByStoreOwnerId(Integer ownerId, Pageable pageable) {
         return shipmentRepository.findByOrderStoreOwnerId(ownerId, pageable);
     }

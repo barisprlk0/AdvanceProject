@@ -19,7 +19,10 @@ export class LoginComponent {
   constructor(private auth: AuthService, private router: Router) {}
 
   async onSubmit(): Promise<void> {
-    if (!this.email() || !this.password()) {
+    const email = this.email().trim().toLowerCase();
+    const password = this.password().trim();
+
+    if (!email || !password) {
       this.errorMessage.set('Lütfen tüm alanları doldurun.');
       return;
     }
@@ -29,8 +32,8 @@ export class LoginComponent {
 
     try {
       const success = await this.auth.login({
-        email: this.email(),
-        password: this.password()
+        email,
+        password
       });
 
       if (success) {
@@ -38,8 +41,8 @@ export class LoginComponent {
       } else {
         this.errorMessage.set('E-posta veya şifre hatalı.');
       }
-    } catch {
-      this.errorMessage.set('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } catch (error: any) {
+      this.errorMessage.set(error?.error?.error || error?.error?.message || 'E-posta veya şifre hatalı.');
     } finally {
       this.isLoading.set(false);
     }

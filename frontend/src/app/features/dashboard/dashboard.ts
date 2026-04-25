@@ -1,11 +1,18 @@
-import { Component, signal, computed, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
-import { Product, Order, Review, Category } from '../../core/models';
-import { Chart, registerables } from 'chart.js';
+import { AuthService } from '../../core/services/auth.service';
+import { Category, Order, Product, Review, Shipment, Store, User } from '../../core/models';
+import { Chart, ChartConfiguration, registerables } from 'chart.js';
 
 Chart.register(...registerables);
+
+type DashboardStat = {
+  label: string;
+  value: string;
+  hint: string;
+  icon: 'revenue' | 'orders' | 'customers' | 'products' | 'shipment' | 'review';
+};
 
 @Component({
   selector: 'app-dashboard',
@@ -14,10 +21,30 @@ Chart.register(...registerables);
   styleUrl: './dashboard.css'
 })
 export class DashboardComponent implements OnInit, AfterViewInit {
-  @ViewChild('revenueChart') revenueCanvas!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('categoryChart') categoryCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('revenueChart') revenueCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('categoryChart') categoryCanvas?: ElementRef<HTMLCanvasElement>;
 
-  constructor(public auth: AuthService, private api: ApiService) {}
+  stats = signal<DashboardStat[]>([]);
+  recentOrders = signal<any[]>([]);
+  topProducts = signal<any[]>([]);
+  recentReviews = signal<Review[]>([]);
+  shipments = signal<Shipment[]>([]);
+  products = signal<Product[]>([]);
+  orders = signal<Order[]>([]);
+  reviews = signal<Review[]>([]);
+  categories = signal<Category[]>([]);
+  users = signal<User[]>([]);
+  stores = signal<Store[]>([]);
+  loading = signal(true);
+
+  private revenueChart?: Chart;
+  private categoryChart?: Chart;
+  private chartsReady = false;
+
+  readonly isIndividual = computed(() => this.auth.hasRole('INDIVIDUAL'));
+  readonly isCorporate = computed(() => this.auth.hasRole('CORPORATE'));
+  readonly isAdmin = computed(() => this.auth.hasRole('ADMIN'));
+  readonly isSellerView = computed(() => this.isCorporate() || this.isAdmin());
 
   readonly greeting = computed(() => {
     const hour = new Date().getHours();
@@ -27,244 +54,320 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     return `İyi akşamlar, ${name}`;
   });
 
-  readonly isAdmin = computed(() => this.auth.hasRole('ADMIN'));
-  readonly isCorporate = computed(() => this.auth.hasAnyRole('ADMIN', 'CORPORATE'));
+  readonly subtitle = computed(() => {
+    if (this.isIndividual()) return 'Alışverişlerin, kargoların ve yorumların tek yerde.';
+    if (this.isCorporate()) return 'Mağazanızın sipariş, ürün ve yorum performansı.';
+    return 'Platform genelindeki satış, kullanıcı ve katalog özeti.';
+  });
 
-  stats = signal([
-    { label: 'Toplam Gelir', value: '—', change: '', positive: true, icon: 'revenue' },
-    { label: 'Siparişler', value: '—', change: '', positive: true, icon: 'orders' },
-    { label: 'Müşteriler', value: '—', change: '', positive: true, icon: 'customers' },
-    { label: 'Ürünler', value: '—', change: '', positive: true, icon: 'products' },
-  ]);
+  readonly deliveredShipments = computed(() => this.shipments().filter(s => this.normalizeStatus(s.status).includes('deliver')).length);
+  readonly pendingShipments = computed(() => this.shipments().filter(s => !this.isFinalStatus(s.status)).length);
+  readonly totalRevenue = computed(() => this.orders().reduce((sum, order) => sum + (Number(order.grandTotal) || 0), 0));
+  readonly averageRating = computed(() => {
+    const list = this.reviews();
+    if (!list.length) return 0;
+    return list.reduce((sum, review) => sum + (Number(review.starRating) || 0), 0) / list.length;
+  });
 
-  recentOrders = signal<any[]>([]);
-  topProducts = signal<any[]>([]);
-  activities = signal<any[]>([]);
-
-  // Store raw data for chart rendering
-  private orders: Order[] = [];
-  private categories: Category[] = [];
+  constructor(public auth: AuthService, private api: ApiService) {}
 
   ngOnInit(): void {
     this.loadDashboardData();
   }
 
   ngAfterViewInit(): void {
-    // Charts will be initialized after data loads
+    this.chartsReady = true;
+    this.renderCharts();
   }
 
-  private loadDashboardData(): void {
-    // Load all data in parallel
-    this.api.getAll<Product>('products').subscribe(products => {
-      this.stats.update(s => {
-        const copy = [...s];
-        copy[3] = { ...copy[3], value: products.length.toLocaleString('tr-TR'), change: `${products.length} kayıtlı`, positive: true };
-        return copy;
-      });
-    });
+  loadDashboardData(): void {
+    this.loading.set(true);
+    const includeAdminData = this.isAdmin();
+    let pending = includeAdminData ? 7 : 5;
+    const done = () => {
+      pending -= 1;
+      if (pending === 0) {
+        this.buildDashboard();
+        this.loading.set(false);
+        setTimeout(() => this.renderCharts(), 0);
+      }
+    };
 
-    this.api.getAll<Order>('orders').subscribe(orders => {
-      this.orders = orders;
+    this.api.getAll<Order>('orders').subscribe({ next: data => this.orders.set(data), error: () => { this.orders.set([]); done(); }, complete: done });
+    this.api.getAll<Product>('products').subscribe({ next: data => this.products.set(data), error: () => { this.products.set([]); done(); }, complete: done });
+    this.api.getAll<Review>('reviews').subscribe({ next: data => this.reviews.set(data), error: () => { this.reviews.set([]); done(); }, complete: done });
+    this.api.getAll<Shipment>('shipments').subscribe({ next: data => this.shipments.set(data), error: () => { this.shipments.set([]); done(); }, complete: done });
+    this.api.getAll<Category>('categories').subscribe({ next: data => this.categories.set(data), error: () => { this.categories.set([]); done(); }, complete: done });
 
-      // Stats: total revenue & order count
-      const totalRevenue = orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
-      this.stats.update(s => {
-        const copy = [...s];
-        copy[0] = { ...copy[0], value: `₺${totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}`, change: `${orders.length} siparişten`, positive: true };
-        copy[1] = { ...copy[1], value: orders.length.toLocaleString('tr-TR'), change: 'toplam sipariş', positive: true };
-        return copy;
-      });
-
-      // Recent orders (last 6)
-      const sorted = [...orders].sort((a, b) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime());
-      this.recentOrders.set(sorted.slice(0, 6).map(o => ({
-        id: `ORD-${o.id}`,
-        customer: o.user?.email?.split('@')[0] || `Müşteri #${o.user?.id || '?'}`,
-        amount: `₺${(o.grandTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
-        status: this.mapStatus(o.status),
-        statusClass: this.mapStatusClass(o.status),
-        date: o.orderDate ? new Date(o.orderDate).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-      })));
-
-      // Activities from recent orders
-      this.activities.set(sorted.slice(0, 5).map(o => ({
-        text: `Sipariş ${o.status?.toLowerCase() || 'oluşturuldu'}`,
-        detail: `ORD-${o.id} · ₺${(o.grandTotal || 0).toLocaleString('tr-TR')}`,
-        time: o.orderDate ? this.timeAgo(new Date(o.orderDate)) : '—',
-        type: 'order'
-      })));
-
-      // Init charts after data loads
-      setTimeout(() => this.initRevenueChart(), 100);
-    });
-
-    if (this.isAdmin()) {
-      this.api.getAll<any>('users').subscribe(users => {
-        const customerCount = users.filter((u: any) => u.roleType?.toLowerCase() !== 'admin').length;
-        this.stats.update(s => {
-          const copy = [...s];
-          copy[2] = { ...copy[2], value: customerCount.toLocaleString('tr-TR'), change: `${users.length} toplam kullanıcı`, positive: true };
-          return copy;
-        });
-      });
-    } else {
-      this.stats.update(s => {
-        const copy = [...s];
-        copy[2] = { ...copy[2], value: 'N/A', change: 'Erişim yetkisi yok', positive: false };
-        return copy;
-      });
+    if (includeAdminData) {
+      this.api.getAll<User>('users').subscribe({ next: data => this.users.set(data), error: () => { this.users.set([]); done(); }, complete: done });
+      this.api.getAll<Store>('stores').subscribe({ next: data => this.stores.set(data), error: () => { this.stores.set([]); done(); }, complete: done });
     }
-
-    this.api.getAll<Category>('categories').subscribe(cats => {
-      this.categories = cats;
-      setTimeout(() => this.initCategoryChart(), 200);
-    });
-
-    // Top products
-    this.api.getAll<Product>('products').subscribe(products => {
-      this.topProducts.set(products.slice(0, 5).map(p => ({
-        name: p.name || p.description || `Ürün #${p.id}`,
-        category: p.category?.name || '—',
-        sold: '—',
-        revenue: `₺${(p.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
-        trend: ''
-      })));
-    });
   }
 
-  private mapStatus(status: string | null | undefined): string {
-    const s = status?.toLowerCase() || '';
+  private buildDashboard(): void {
+    this.recentOrders.set(this.orders()
+      .slice()
+      .sort((a, b) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime())
+      .slice(0, 6)
+      .map(order => ({
+        id: order.id,
+        customer: order.user?.email?.split('@')[0] || 'Müşteri',
+        amount: this.formatMoney(order.grandTotal),
+        status: this.statusLabel(this.effectiveOrderStatus(order)),
+        statusClass: this.statusClass(this.effectiveOrderStatus(order)),
+        date: this.formatDate(order.orderDate),
+        itemCount: order.items?.length || 0
+      })));
+
+    this.recentReviews.set(this.reviews().slice(0, 6));
+
+    if (this.isIndividual()) {
+      this.buildCustomerDashboard();
+    } else if (this.isAdmin()) {
+      this.buildAdminDashboard();
+    } else {
+      this.buildSellerDashboard();
+    }
+  }
+
+  private buildAdminDashboard(): void {
+    const orders = this.orders();
+    const products = this.products();
+    const reviews = this.reviews();
+    const users = this.users();
+    const stores = this.stores();
+    const activeStores = stores.filter(store => this.normalizeStatus(store.status).includes('active')).length;
+    const individualUsers = users.filter(user => this.normalizeStatus(user.roleType) === 'individual').length;
+    const corporateUsers = users.filter(user => this.normalizeStatus(user.roleType) === 'corporate').length;
+
+    this.stats.set([
+      { label: 'Platform Geliri', value: this.formatMoney(this.totalRevenue()), hint: `${orders.length} sipariş`, icon: 'revenue' },
+      { label: 'Kullanıcılar', value: users.length.toLocaleString('tr-TR'), hint: `${individualUsers} müşteri · ${corporateUsers} kurumsal`, icon: 'customers' },
+      { label: 'Mağazalar', value: stores.length.toLocaleString('tr-TR'), hint: `${activeStores} aktif mağaza`, icon: 'products' },
+      { label: 'Yorumlar', value: reviews.length.toLocaleString('tr-TR'), hint: `${this.averageRating().toFixed(1)} ortalama puan`, icon: 'review' }
+    ]);
+
+    const revenueByProduct = new Map<number, { count: number; revenue: number }>();
+    orders.forEach(order => order.items?.forEach(item => {
+      const id = item.product?.id;
+      if (!id) return;
+      const current = revenueByProduct.get(id) || { count: 0, revenue: 0 };
+      current.count += Number(item.quantity) || 0;
+      current.revenue += (Number(item.price) || 0) * (Number(item.quantity) || 0);
+      revenueByProduct.set(id, current);
+    }));
+
+    this.topProducts.set(products
+      .map(product => {
+        const metric = revenueByProduct.get(product.id) || { count: 0, revenue: 0 };
+        return {
+          id: product.id,
+          name: product.name || product.description || `Ürün #${product.id}`,
+          category: product.store?.name || product.category?.name || 'Katalog',
+          metric: this.formatMoney(metric.revenue || product.unitPrice),
+          detail: `${metric.count} satış`
+        };
+      })
+      .sort((a, b) => (revenueByProduct.get(b.id)?.revenue || 0) - (revenueByProduct.get(a.id)?.revenue || 0))
+      .slice(0, 5));
+  }
+
+  private buildCustomerDashboard(): void {
+    const orders = this.orders();
+    const reviews = this.reviews();
+    const shipments = this.shipments();
+    const spending = orders.reduce((sum, order) => sum + (Number(order.grandTotal) || 0), 0);
+
+    this.stats.set([
+      { label: 'Toplam Harcama', value: this.formatMoney(spending), hint: `${orders.length} siparişten`, icon: 'revenue' },
+      { label: 'Siparişlerim', value: orders.length.toLocaleString('tr-TR'), hint: `${this.deliveredShipments()} teslim edildi`, icon: 'orders' },
+      { label: 'Aktif Kargo', value: this.pendingShipments().toLocaleString('tr-TR'), hint: `${shipments.length} kargo kaydı`, icon: 'shipment' },
+      { label: 'Yorumlarım', value: reviews.length.toLocaleString('tr-TR'), hint: `${this.averageRating().toFixed(1)} ortalama puan`, icon: 'review' }
+    ]);
+
+    this.topProducts.set(this.products().slice(0, 5).map(product => ({
+      id: product.id,
+      name: product.name || product.description || `Ürün #${product.id}`,
+      category: product.category?.name || 'Kategori yok',
+      metric: this.formatMoney(product.unitPrice),
+      detail: product.store?.name || 'Mağaza yok'
+    })));
+  }
+
+  private buildSellerDashboard(): void {
+    const orders = this.orders();
+    const products = this.products();
+    const reviews = this.reviews();
+    const customers = new Set(orders.map(order => order.user?.id).filter(Boolean)).size;
+
+    this.stats.set([
+      { label: this.isAdmin() ? 'Platform Geliri' : 'Mağaza Geliri', value: this.formatMoney(this.totalRevenue()), hint: `${orders.length} siparişten`, icon: 'revenue' },
+      { label: 'Siparişler', value: orders.length.toLocaleString('tr-TR'), hint: `${this.deliveredShipments()} teslim edildi`, icon: 'orders' },
+      { label: this.isAdmin() ? 'Müşteriler' : 'Müşteri Sayısı', value: customers.toLocaleString('tr-TR'), hint: 'tekil müşteri', icon: 'customers' },
+      { label: 'Ürünler', value: products.length.toLocaleString('tr-TR'), hint: `${reviews.length} yorum`, icon: 'products' }
+    ]);
+
+    const soldByProduct = new Map<number, { count: number; revenue: number }>();
+    orders.forEach(order => order.items?.forEach(item => {
+      const id = item.product?.id;
+      if (!id) return;
+      const current = soldByProduct.get(id) || { count: 0, revenue: 0 };
+      current.count += Number(item.quantity) || 0;
+      current.revenue += (Number(item.price) || 0) * (Number(item.quantity) || 0);
+      soldByProduct.set(id, current);
+    }));
+
+    this.topProducts.set(products
+      .map(product => {
+        const sold = soldByProduct.get(product.id) || { count: 0, revenue: 0 };
+        return {
+          id: product.id,
+          name: product.name || product.description || `Ürün #${product.id}`,
+          category: product.category?.name || 'Kategori yok',
+          metric: this.formatMoney(sold.revenue || product.unitPrice),
+          detail: `${sold.count} satış`
+        };
+      })
+      .sort((a, b) => Number((soldByProduct.get(b.id)?.count || 0) - (soldByProduct.get(a.id)?.count || 0)))
+      .slice(0, 5));
+  }
+
+  effectiveOrderStatus(order: Order): string {
+    const shipment = this.shipments().find(item => item.order?.id === order.id);
+    return shipment?.status || order.status || 'Pending';
+  }
+
+  statusLabel(status: string | null | undefined): string {
+    const s = this.normalizeStatus(status);
     if (s.includes('deliver') || s.includes('teslim')) return 'Teslim Edildi';
-    if (s.includes('ship') || s.includes('kargo')) return 'Kargoda';
+    if (s.includes('ship') || s.includes('transit') || s.includes('kargo')) return 'Kargoda';
     if (s.includes('process') || s.includes('hazır')) return 'Hazırlanıyor';
     if (s.includes('cancel') || s.includes('iptal')) return 'İptal';
-    if (s.includes('pending') || s.includes('bekl')) return 'Bekleyen';
-    return status || 'Bekleyen';
+    return 'Bekliyor';
   }
 
-  private mapStatusClass(status: string | null | undefined): string {
-    const s = status?.toLowerCase() || '';
+  statusClass(status: string | null | undefined): string {
+    const s = this.normalizeStatus(status);
     if (s.includes('deliver') || s.includes('teslim')) return 'success';
-    if (s.includes('ship') || s.includes('kargo')) return 'warning';
+    if (s.includes('ship') || s.includes('transit') || s.includes('kargo')) return 'warning';
     if (s.includes('process') || s.includes('hazır')) return 'primary';
     if (s.includes('cancel') || s.includes('iptal')) return 'danger';
     return 'secondary';
   }
 
-  private timeAgo(date: Date): string {
-    const diff = Date.now() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins} dk önce`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} saat önce`;
-    return `${Math.floor(hours / 24)} gün önce`;
+  isFinalStatus(status: string | null | undefined): boolean {
+    const s = this.normalizeStatus(status);
+    return s.includes('deliver') || s.includes('cancel') || s.includes('teslim') || s.includes('iptal');
   }
 
-  private initRevenueChart(): void {
-    if (!this.revenueCanvas) return;
-    const ctx = this.revenueCanvas.nativeElement.getContext('2d');
-    if (!ctx) return;
+  starText(rating: number | null | undefined): string {
+    const value = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+    return '★'.repeat(value) + '☆'.repeat(5 - value);
+  }
 
-    // Group orders by month
-    const monthlyRevenue = new Array(12).fill(0);
-    this.orders.forEach(o => {
-      if (o.orderDate) {
-        const month = new Date(o.orderDate).getMonth();
-        monthlyRevenue[month] += (o.grandTotal || 0);
-      }
+  productName(review: Review): string {
+    return review.product?.name || review.product?.description || 'Ürün';
+  }
+
+  userName(review: Review): string {
+    return review.user?.email?.split('@')[0] || 'Müşteri';
+  }
+
+  formatMoney(value: number | null | undefined): string {
+    return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(Number(value) || 0);
+  }
+
+  formatDate(value: string | null | undefined): string {
+    if (!value) return '-';
+    return new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
+  }
+
+  private normalizeStatus(status: string | null | undefined): string {
+    return (status || '').toLowerCase();
+  }
+
+  private renderCharts(): void {
+    if (!this.chartsReady || !this.revenueCanvas || !this.categoryCanvas) return;
+    this.revenueChart?.destroy();
+    this.categoryChart?.destroy();
+    this.revenueChart = new Chart(this.revenueCanvas.nativeElement, this.revenueChartConfig());
+    this.categoryChart = new Chart(this.categoryCanvas.nativeElement, this.categoryChartConfig());
+  }
+
+  private revenueChartConfig(): ChartConfiguration<'line'> {
+    const monthly = new Array(12).fill(0);
+    this.orders().forEach(order => {
+      if (!order.orderDate) return;
+      monthly[new Date(order.orderDate).getMonth()] += Number(order.grandTotal) || 0;
     });
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 250);
-    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.15)');
-    gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
-
-    new Chart(ctx, {
+    return {
       type: 'line',
       data: {
         labels: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'],
         datasets: [{
-          label: 'Gelir',
-          data: monthlyRevenue,
+          label: this.isIndividual() ? 'Harcama' : 'Gelir',
+          data: monthly,
           borderColor: '#4f46e5',
-          backgroundColor: gradient,
+          backgroundColor: 'rgba(79, 70, 229, 0.08)',
           fill: true,
-          tension: 0.4,
+          tension: 0.35,
           borderWidth: 2.5,
-          pointRadius: 0,
-          pointHoverRadius: 6,
-          pointHoverBackgroundColor: '#4f46e5',
-          pointHoverBorderColor: '#fff',
-          pointHoverBorderWidth: 2,
+          pointRadius: 2
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0f172a',
-            titleFont: { family: 'Inter', size: 12 },
-            bodyFont: { family: 'Inter', size: 13 },
-            padding: 12,
-            cornerRadius: 8,
-            displayColors: false,
-            callbacks: {
-              label: (ctx) => `₺${(ctx.parsed.y ?? 0).toLocaleString('tr-TR')}`
-            }
-          }
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#94a3b8' }, border: { display: false } },
-          y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#94a3b8', callback: (val) => `₺${Number(val) / 1000}K` }, border: { display: false } }
-        },
-        interaction: { intersect: false, mode: 'index' }
+          x: { grid: { display: false }, border: { display: false } },
+          y: { border: { display: false }, ticks: { callback: value => `₺${Number(value) / 1000}K` } }
+        }
       }
-    });
+    };
   }
 
-  private initCategoryChart(): void {
-    if (!this.categoryCanvas) return;
-    const ctx = this.categoryCanvas.nativeElement.getContext('2d');
-    if (!ctx) return;
+  private categoryChartConfig(): ChartConfiguration<'doughnut'> {
+    const counts = new Map<string, number>();
+    if (this.isIndividual()) {
+      this.orders().forEach(order => order.items?.forEach(item => {
+        const category = item.product?.category?.name || 'Diğer';
+        counts.set(category, (counts.get(category) || 0) + (Number(item.quantity) || 1));
+      }));
+    } else {
+      this.products().forEach(product => {
+        const category = product.category?.name || 'Diğer';
+        counts.set(category, (counts.get(category) || 0) + 1);
+      });
+    }
 
-    const colors = ['#4f46e5', '#0891b2', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6', '#f97316', '#06b6d4'];
-    const labels = this.categories.map(c => c.name || `Kat #${c.id}`);
-    const data = this.categories.map((_, i) => Math.max(1, Math.round(100 / this.categories.length) + (i % 3) * 5));
+    const entries = Array.from(counts.entries()).slice(0, 6);
+    const labels = entries.length ? entries.map(([label]) => label) : ['Veri yok'];
+    const data = entries.length ? entries.map(([, value]) => value) : [1];
 
-    new Chart(ctx, {
+    return {
       type: 'doughnut',
       data: {
         labels,
         datasets: [{
           data,
-          backgroundColor: colors.slice(0, labels.length),
-          borderWidth: 0,
-          hoverOffset: 6
+          backgroundColor: ['#4f46e5', '#0891b2', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'],
+          borderWidth: 0
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '72%',
+        cutout: '70%',
         plugins: {
           legend: {
-            display: true,
             position: 'bottom',
-            labels: {
-              padding: 16, boxWidth: 10, boxHeight: 10,
-              font: { family: 'Inter', size: 11 }, color: '#64748b',
-              usePointStyle: true, pointStyle: 'circle'
-            }
-          },
-          tooltip: {
-            backgroundColor: '#0f172a',
-            padding: 12,
-            cornerRadius: 8,
-            callbacks: { label: (ctx) => ` ${ctx.label}: %${ctx.parsed}` }
+            labels: { usePointStyle: true, boxWidth: 10, boxHeight: 10 }
           }
         }
       }
-    });
+    };
   }
 }
