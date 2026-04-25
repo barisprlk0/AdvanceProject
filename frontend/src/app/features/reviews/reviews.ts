@@ -138,21 +138,7 @@ export class ReviewsComponent implements OnInit {
         this.totalPages.set(res.totalPages);
         this.loading.set(false);
 
-        // Calculate stats (based on current page for now, or fetch all stats if needed)
-        // For now, I'll just use the first page to estimate or keep previous logic if it worked.
-        const total = res.totalElements;
-        if (total > 0) {
-          // Note: Full stats would need a separate API call or a full fetch.
-          // For simplicity, we'll just show partial stats or hardcoded ones.
-          this.avgRating.set(4.2); // Mocked average
-          this.ratingBars.set([
-            { stars: 5, count: Math.round(total * 0.6), percent: 60 },
-            { stars: 4, count: Math.round(total * 0.2), percent: 20 },
-            { stars: 3, count: Math.round(total * 0.1), percent: 10 },
-            { stars: 2, count: Math.round(total * 0.05), percent: 5 },
-            { stars: 1, count: Math.round(total * 0.05), percent: 5 },
-          ]);
-        }
+        this.updateReviewStats();
       },
       error: () => this.loading.set(false)
     });
@@ -161,6 +147,25 @@ export class ReviewsComponent implements OnInit {
   onPageChange(page: number): void {
     this.currentPage.set(page);
     this.fetchReviews();
+  }
+
+  private updateReviewStats(): void {
+    this.api.getAll<Review>('reviews').subscribe(allReviews => {
+      const total = allReviews.length;
+      const average = total > 0
+        ? allReviews.reduce((sum, review) => sum + (review.starRating || 0), 0) / total
+        : 0;
+
+      this.avgRating.set(average);
+      this.ratingBars.set([5, 4, 3, 2, 1].map(stars => {
+        const count = allReviews.filter(review => review.starRating === stars).length;
+        return {
+          stars,
+          count,
+          percent: total > 0 ? Math.round((count / total) * 100) : 0
+        };
+      }));
+    });
   }
 
   deleteReview(id: number): void {

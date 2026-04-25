@@ -92,18 +92,9 @@ export class AuthService {
       localStorage.setItem('sl_user', JSON.stringify(user));
       this.currentUser.set(user);
       return true;
-    } catch {
-      // Demo fallback
-      const user: User = {
-        id: 0,
-        email: request.email,
-        roleType: request.roleType || 'Individual'
-      };
-      localStorage.setItem('sl_token', 'demo-token-' + Date.now());
-      localStorage.setItem('sl_user', JSON.stringify(user));
-      this.token.set('demo-token-' + Date.now());
-      this.currentUser.set(user);
-      return true;
+    } catch (err: any) {
+      console.error('Backend register failed:', err);
+      throw err;
     }
   }
 
@@ -129,9 +120,4 @@ export class AuthService {
     return current ? roles.includes(current) : false;
   }
 
-  private guessRoleFromEmail(email: string): string {
-    if (email.includes('admin')) return 'Admin';
-    if (email.includes('corp') || email.includes('store')) return 'Corporate';
-    return 'Individual';
-  }
 }

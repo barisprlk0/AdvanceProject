@@ -11,6 +11,7 @@ import com.advanceproject.backend.entity.Shipment;
 @Repository
 public interface ShipmentRepository extends JpaRepository<Shipment, Integer> {
     Page<Shipment> findByOrderUserId(Integer userId, Pageable pageable);
+    List<Shipment> findByOrderUserId(Integer userId);
     Page<Shipment> findByOrderStoreOwnerId(Integer ownerId, Pageable pageable);
     List<Shipment> findByOrderStoreOwnerId(Integer ownerId);
 }

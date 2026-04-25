@@ -43,9 +43,31 @@ public class UserService {
     public User updateUser(Integer id, User updatedUser) {
         return userRepository.findById(id).map(user -> {
             user.setEmail(updatedUser.getEmail());
-            user.setPasswordHash(updatedUser.getPasswordHash());
-            user.setRoleType(updatedUser.getRoleType());
+            if (updatedUser.getPasswordHash() != null && !updatedUser.getPasswordHash().isBlank()) {
+                user.setPasswordHash(updatedUser.getPasswordHash());
+            }
+            if (updatedUser.getRoleType() != null && !updatedUser.getRoleType().isBlank()) {
+                user.setRoleType(updatedUser.getRoleType());
+            }
             user.setGender(updatedUser.getGender());
+            return userRepository.save(user);
+        }).orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public User patchUser(Integer id, User partialUser) {
+        return userRepository.findById(id).map(user -> {
+            if (partialUser.getEmail() != null && !partialUser.getEmail().isBlank()) {
+                user.setEmail(partialUser.getEmail());
+            }
+            if (partialUser.getPasswordHash() != null && !partialUser.getPasswordHash().isBlank()) {
+                user.setPasswordHash(partialUser.getPasswordHash());
+            }
+            if (partialUser.getRoleType() != null && !partialUser.getRoleType().isBlank()) {
+                user.setRoleType(partialUser.getRoleType());
+            }
+            if (partialUser.getGender() != null) {
+                user.setGender(partialUser.getGender());
+            }
             return userRepository.save(user);
         }).orElseThrow(() -> new RuntimeException("User not found"));
     }

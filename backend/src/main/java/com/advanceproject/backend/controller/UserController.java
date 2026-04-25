@@ -39,6 +39,24 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<User> updateProfile(Authentication authentication, @RequestBody User user) {
+        User currentUser = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setRoleType(currentUser.getRoleType());
+        return ResponseEntity.ok(userService.updateUser(currentUser.getId(), user));
+    }
+
+    @PatchMapping("/profile")
+    public ResponseEntity<User> patchProfile(Authentication authentication, @RequestBody User user) {
+        User currentUser = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setRoleType(currentUser.getRoleType());
+        return ResponseEntity.ok(userService.patchUser(currentUser.getId(), user));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable Integer id) {
         return userService.getUserById(id)
@@ -49,6 +67,11 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Integer id, @RequestBody User user) {
         return ResponseEntity.ok(userService.updateUser(id, user));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<User> patchUser(@PathVariable Integer id, @RequestBody User user) {
+        return ResponseEntity.ok(userService.patchUser(id, user));
     }
 
     @DeleteMapping("/{id}")

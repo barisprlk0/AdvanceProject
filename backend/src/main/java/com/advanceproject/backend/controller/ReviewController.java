@@ -2,6 +2,7 @@ package com.advanceproject.backend.controller;
 
 import com.advanceproject.backend.entity.Review;
 import com.advanceproject.backend.entity.User;
+import com.advanceproject.backend.service.ProductService;
 import com.advanceproject.backend.service.ReviewService;
 import com.advanceproject.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,25 +20,55 @@ public class ReviewController {
 
     private final ReviewService reviewService;
     private final UserService userService;
+    private final ProductService productService;
 
     @Autowired
-    public ReviewController(ReviewService reviewService, UserService userService) {
+    public ReviewController(ReviewService reviewService, UserService userService, ProductService productService) {
         this.reviewService = reviewService;
         this.userService = userService;
+        this.productService = productService;
     }
 
     @PostMapping
-    public ResponseEntity<Review> createReview(@RequestBody Review review) {
+    public ResponseEntity<Review> createReview(@RequestBody Review review, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!"INDIVIDUAL".equalsIgnoreCase(user.getRoleType())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        if (review.getProduct() == null || review.getProduct().getId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        review.setUser(user);
+        review.setProduct(productService.getProductById(review.getProduct().getId())
+                .orElseThrow(() -> new RuntimeException("Product not found")));
+        if (review.getHelpfulnessVotes() == null) {
+            review.setHelpfulnessVotes(0);
+        }
+
         return ResponseEntity.ok(reviewService.createReview(review));
     }
 
     @GetMapping
-    public ResponseEntity<Page<Review>> getAllReviews(Pageable pageable, Authentication authentication) {
+    public ResponseEntity<Page<Review>> getAllReviews(
+            Pageable pageable,
+            Authentication authentication,
+            @RequestParam(required = false) Integer productId
+    ) {
+        if (productId != null) {
+            return ResponseEntity.ok(reviewService.getReviewsByProductId(productId, pageable));
+        }
+
         User user = userService.getUserByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if ("CORPORATE".equalsIgnoreCase(user.getRoleType())) {
             return ResponseEntity.ok(reviewService.getReviewsByOwnerId(user.getId(), pageable));
+        } else if ("INDIVIDUAL".equalsIgnoreCase(user.getRoleType())) {
+            return ResponseEntity.ok(reviewService.getReviewsByUserId(user.getId(), pageable));
         }
 
         return ResponseEntity.ok(reviewService.getAllReviews(pageable));
@@ -64,6 +95,28 @@ public class ReviewController {
         }
 
         return ResponseEntity.ok(reviewService.updateReview(id, review));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<Review> patchReview(@PathVariable Integer id, @RequestBody Review review, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Review existingReview = reviewService.getReviewById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found"));
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) &&
+            !"CORPORATE".equalsIgnoreCase(user.getRoleType()) &&
+            !existingReview.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        if ("CORPORATE".equalsIgnoreCase(user.getRoleType()) &&
+            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(reviewService.patchReview(id, review));
     }
 
     @DeleteMapping("/{id}")

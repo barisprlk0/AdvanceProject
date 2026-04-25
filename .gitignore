@@ -5,6 +5,7 @@
 __pycache__/
 *.pyc
 .env
+*.log
 
 # IDE
 .idea/

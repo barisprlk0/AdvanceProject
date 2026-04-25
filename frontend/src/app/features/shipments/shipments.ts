@@ -115,10 +115,7 @@ export class ShipmentsComponent implements OnInit {
         this.totalPages.set(res.totalPages);
         this.loading.set(false);
         
-        // Mocking stats for now based on current page or hardcoded
-        this.deliveredCount.set(Math.round(res.totalElements * 0.4));
-        this.inTransitCount.set(Math.round(res.totalElements * 0.3));
-        this.warehouseCount.set(5); // Mocked
+        this.updateShipmentStats();
       },
       error: () => this.loading.set(false)
     });
@@ -127,6 +124,22 @@ export class ShipmentsComponent implements OnInit {
   onPageChange(page: number): void {
     this.currentPage.set(page);
     this.fetchShipments();
+  }
+
+  private updateShipmentStats(): void {
+    this.api.getAll<Shipment>('shipments').subscribe(allShipments => {
+      this.deliveredCount.set(allShipments.filter(shipment =>
+        shipment.status?.toLowerCase().includes('deliver') ||
+        shipment.status?.toLowerCase().includes('teslim')
+      ).length);
+      this.inTransitCount.set(allShipments.filter(shipment =>
+        shipment.status?.toLowerCase().includes('transit') ||
+        shipment.status?.toLowerCase().includes('ship') ||
+        shipment.status?.toLowerCase().includes('yolda') ||
+        shipment.status?.toLowerCase().includes('kargo')
+      ).length);
+      this.warehouseCount.set(new Set(allShipments.map(shipment => shipment.warehouse).filter(Boolean)).size);
+    });
   }
 
   updateShipmentStatus(shipment: Shipment, newStatus: string): void {
