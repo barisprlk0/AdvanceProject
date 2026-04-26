@@ -141,6 +141,28 @@ export interface ChatMessage {
   isLoading?: boolean;
 }
 
+export interface ChatChartData {
+  type: 'bar' | 'line';
+  title: string;
+  xLabel: string;
+  yLabel: string;
+  labels: string[];
+  values: number[];
+  visualizationCode: string;
+}
+
+export interface ChatAskResponse {
+  inScope: boolean;
+  greeting: boolean;
+  roleScope: string;
+  finalAnswer: string;
+  sqlQuery?: string;
+  rejectionReason?: string;
+  retryCount: number;
+  rows: Record<string, unknown>[];
+  chart?: ChatChartData;
+}
+
 // --- Pagination ---
 export interface PageResponse<T> {
   content: T[];
