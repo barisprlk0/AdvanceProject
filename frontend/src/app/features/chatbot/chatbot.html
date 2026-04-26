@@ -1,0 +1,116 @@
+<div class="chatbot-page fade-in">
+  <div class="chat-container">
+    <div class="chat-sidebar">
+      <div class="chat-sidebar-header">
+        <h3>AI Assistant</h3>
+      </div>
+      <div class="chat-sessions">
+        <div class="session-item active">
+          <span>Multi-Agent Text2SQL</span>
+        </div>
+      </div>
+      <div class="chat-sidebar-footer">
+        <div class="ai-badge">
+          <div class="ai-dot"></div>
+          <span>Guardrails / SQL / Analysis / Viz</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-main">
+      <div class="chat-messages" #messagesContainer>
+        @for (msg of messages(); track msg.id) {
+          <div class="message" [class.user]="msg.role === 'user'" [class.assistant]="msg.role === 'assistant'">
+            @if (msg.role === 'assistant') {
+              <div class="msg-avatar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="8" height="8" rx="2" fill="#818cf8"/>
+                  <rect x="13" y="3" width="8" height="8" rx="2" fill="#6366f1" opacity="0.7"/>
+                  <rect x="3" y="13" width="8" height="8" rx="2" fill="#6366f1" opacity="0.7"/>
+                  <rect x="13" y="13" width="8" height="8" rx="2" fill="#4f46e5"/>
+                </svg>
+              </div>
+            }
+
+            <div class="msg-bubble">
+              @if (msg.isLoading) {
+                <div class="typing-indicator">
+                  <span></span><span></span><span></span>
+                </div>
+              } @else {
+                <div class="msg-content" [innerHTML]="msg.content"></div>
+
+                @if (msg.roleScope) {
+                  <div class="scope-chip">Scope: {{ msg.roleScope }}</div>
+                }
+
+                @if (msg.chart) {
+                  <div class="mini-chart">
+                    <div class="mini-chart-title">{{ msg.chart.title }}</div>
+                    @for (label of msg.chart.labels; track label; let i = $index) {
+                      <div class="bar-row">
+                        <span class="bar-label">{{ label }}</span>
+                        <div class="bar-track">
+                          <div class="bar-fill" [style.width]="getBarWidth(msg.chart.values[i], msg.chart.values)"></div>
+                        </div>
+                        <span class="bar-value">{{ msg.chart.values[i] | number:'1.0-2' }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (msg.rows && msg.rows.length > 0) {
+                  <details class="rows-panel">
+                    <summary>Show result rows ({{ msg.rows.length }})</summary>
+                    @for (row of msg.rows; track trackByRowIndex($index)) {
+                      <div class="row-line">{{ row | json }}</div>
+                    }
+                  </details>
+                }
+
+                @if (msg.sql) {
+                  <button class="sql-toggle" (click)="toggleSql(msg.sql!)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    {{ showSql() === msg.sql ? 'Hide SQL' : 'Show SQL' }}
+                  </button>
+                  @if (showSql() === msg.sql) {
+                    <pre class="sql-block"><code>{{ msg.sql }}</code></pre>
+                  }
+                }
+              }
+              <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="suggestions">
+        <div class="suggestions-header">Test Questions (20) — click to send</div>
+        @for (suggestion of suggestions(); track suggestion) {
+          <button class="suggestion-btn" (click)="sendMessage(suggestion)">{{ suggestion }}</button>
+        }
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <input
+            type="text"
+            class="chat-input"
+            placeholder="Ask an analytics question in natural language..."
+            [ngModel]="inputText()"
+            (ngModelChange)="inputText.set($event)"
+            (keydown.enter)="sendMessage()">
+          <button class="send-btn" (click)="sendMessage()" [disabled]="!inputText().trim()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <p class="chat-disclaimer">Answers are generated from SQL over role-scoped data.</p>
+      </div>
+    </div>
+  </div>
+</div>

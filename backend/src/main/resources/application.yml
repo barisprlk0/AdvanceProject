@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: advance-project-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/e_commerce
+    username: postgres
+    password: 604730
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Tabloları ETL oluşturduğu için JPA'nın silmesini engelliyoruz
+    show-sql: true # Konsolda SQL sorgularını görmek için
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080 # Backend uygulamamız 8080 portunda çalışacak
+
+jwt:
+  secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a756b5c3d4e5f6
+  expiration: 36000000 # 10 hours in milliseconds
+  refresh-expiration: 1209600000 # 14 days in milliseconds
+
+ai:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-flash-latest}
+  chat:
+    max-rows: 200
+    max-retries: 3

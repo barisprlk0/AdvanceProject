@@ -1,0 +1,166 @@
+<div class="analytics-page fade-in">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">@if (isCorporate()) { Kurumsal Analitik } @else { Admin Analitik }</h1>
+      <p class="page-subtitle">
+        @if (isCorporate()) { Magaza bazli gelir, musteri segmenti ve kategori performansi }
+        @else { Platform geneli gelir, kullanici, magaza ve memnuniyet analizi }
+      </p>
+    </div>
+    <div class="header-actions">
+      @if (isCorporate()) {
+        <input class="form-input" type="date" [value]="fromDate()" (change)="fromDate.set($any($event.target).value)" style="width:160px">
+        <input class="form-input" type="date" [value]="toDate()" (change)="toDate.set($any($event.target).value)" style="width:160px">
+        <button class="btn btn-secondary btn-sm" (click)="applyDateRange()">Filtrele</button>
+        <button class="btn btn-secondary btn-sm" (click)="resetDateRange()">Sifirla</button>
+      } @else {
+        <button class="btn btn-secondary btn-sm" routerLink="/app/users">Kullanicilar</button>
+        <button class="btn btn-primary btn-sm" routerLink="/app/stores">Magazalar</button>
+      }
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card analytics-loading">
+      <span class="spinner"></span>
+      <p>Analiz verileri yukleniyor...</p>
+    </div>
+  } @else {
+    <div class="kpi-grid">
+      @for (kpi of kpis(); track kpi.label) {
+        <div class="kpi-card" [attr.data-tone]="kpi.tone">
+          <div class="kpi-label">{{ kpi.label }}</div>
+          <div class="kpi-value">{{ kpi.value }}</div>
+          <div class="kpi-detail">{{ kpi.detail }}</div>
+        </div>
+      }
+    </div>
+
+    <div class="charts-grid">
+      <section class="card chart-card-wide">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Aylik Gelir Performansi</h3>
+            <p class="card-subtitle">Toplam gelir ve teslim edilen siparis geliri</p>
+          </div>
+        </div>
+        <div class="chart-wrapper-lg"><canvas #revenueChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Siparis Durumlari</h3>
+            <p class="card-subtitle">Kargo durumu oncelikli</p>
+          </div>
+        </div>
+        <div class="chart-wrapper-sm"><canvas #statusChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Kullanici Rolleri</h3>
+            <p class="card-subtitle">Admin, kurumsal ve musteri dagilimi</p>
+          </div>
+        </div>
+        <div class="chart-wrapper-sm"><canvas #roleChart></canvas></div>
+      </section>
+
+      <section class="card chart-card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Puan Dagilimi</h3>
+            <p class="card-subtitle">Urun yorum yildizlari</p>
+          </div>
+        </div>
+        <div class="chart-wrapper-sm"><canvas #ratingChart></canvas></div>
+      </section>
+    </div>
+
+    <div class="tables-grid">
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Magaza Performansi</h3>
+            <p class="card-subtitle">Gelire gore ilk magazalar</p>
+          </div>
+        </div>
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>Magaza</th>
+              <th>Sahip</th>
+              <th>Urun</th>
+              <th>Siparis</th>
+              <th>Gelir</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (store of topStores(); track store.id) {
+              <tr>
+                <td><strong>{{ store.name }}</strong><span class="row-sub">{{ store.status }}</span></td>
+                <td>{{ store.owner }}</td>
+                <td>{{ store.products }}</td>
+                <td>{{ store.orders }}</td>
+                <td class="font-medium">{{ store.revenue }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="empty-cell">Magaza verisi yok.</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Kategori Performansi</h3>
+            <p class="card-subtitle">Urun, satis ve gelir kirilimi</p>
+          </div>
+        </div>
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>Kategori</th>
+              <th>Urun</th>
+              <th>Satis</th>
+              <th>Gelir</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (category of categoryRows(); track category.name) {
+              <tr>
+                <td><strong>{{ category.name }}</strong></td>
+                <td>{{ category.products }}</td>
+                <td>{{ category.orders }}</td>
+                <td class="font-medium">{{ category.revenue }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="empty-cell">Kategori verisi yok.</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <div class="bottom-grid">
+      <section class="card">
+        <h3 class="card-title">Son Yorumlar</h3>
+        <div class="review-list">
+          @for (review of recentReviews(); track review.id) {
+            <article class="review-item">
+              <div>
+                <strong>{{ productName(review) }}</strong>
+                <span>{{ userName(review) }} - {{ stars(reviewRating(review)) }}</span>
+              </div>
+              <p>{{ review.sentiment || 'Yorum metni yok.' }}</p>
+            </article>
+          } @empty {
+            <div class="empty-cell">Yorum bulunamadi.</div>
+          }
+        </div>
+      </section>
+    </div>
+  }
+</div>

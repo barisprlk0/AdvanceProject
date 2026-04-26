@@ -1,0 +1,91 @@
+<div class="orders-page fade-in">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Siparişler</h1>
+      <p class="page-subtitle">Sipariş yönetimi ve takibi</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" (click)="exportOrders()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Dışa Aktar
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="order-tabs">
+    @for (tab of tabs(); track tab.key) {
+      <button class="order-tab" [class.active]="activeTab() === tab.key" (click)="setActiveTab(tab.key)">
+        {{ tab.label }}
+        <span class="tab-count">{{ tab.count }}</span>
+      </button>
+    }
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Sipariş No</th>
+          <th>Müşteri</th>
+          <th>Ürün Sayısı</th>
+          <th>Tutar</th>
+          <th>Ödeme</th>
+          <th>Durum</th>
+          <th>Tarih</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (order of orders(); track order.id) {
+          <tr [routerLink]="['/app/orders', order.id]" class="clickable-row">
+            <td><span class="order-id">#{{ order.id }}</span></td>
+            <td>
+              <div class="customer-cell">
+                <div class="customer-avatar" [style.background]="'hsl(' + ((order.id || '').toString().length * 47 % 360) + ', 50%, 88%)'">
+                  <span [style.color]="'hsl(' + ((order.id || '').toString().length * 47 % 360) + ', 55%, 40%)'">{{ getInitial(order.customer) }}</span>
+                </div>
+                <div>
+                  <span class="customer-name">{{ order.customer }}</span>
+                  <span class="customer-email">{{ order.email }}</span>
+                </div>
+              </div>
+            </td>
+            <td>{{ order.items }} ürün</td>
+            <td class="font-medium">{{ order.amount | currency:'TRY':'symbol':'1.2-2':'tr-TR' }}</td>
+            <td class="text-muted">{{ order.payment }}</td>
+            <td><span class="badge" [class]="'badge-' + order.statusKey">{{ order.status }}</span></td>
+            <td class="text-muted text-sm">{{ order.date }}</td>
+            <td>
+              @if (auth.hasRole('ADMIN')) {
+                <select class="form-select status-select" (change)="updateOrderStatus(order, $any($event.target).value, $event)" (click)="$event.stopPropagation()">
+                  <option [selected]="order.status === 'Pending'" value="Pending">Bekliyor</option>
+                  <option [selected]="order.status === 'Processing'" value="Processing">Hazırlanıyor</option>
+                  <option [selected]="order.status === 'Shipped'" value="Shipped">Kargoda</option>
+                  <option [selected]="order.status === 'Delivered'" value="Delivered">Teslim Edildi</option>
+                  <option [selected]="order.status === 'Cancelled'" value="Cancelled">İptal Edildi</option>
+                </select>
+              } @else if (canShip(order)) {
+                <button class="btn btn-primary btn-sm" [disabled]="isShipping(order.id)" (click)="shipOrder(order, $event)">
+                  Kargoya Ver
+                </button>
+              } @else {
+                <span class="text-muted text-sm">—</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <app-pagination 
+    [page]="currentPage()" 
+    [size]="pageSize()" 
+    [totalElements]="totalElements()" 
+    [totalPages]="totalPages()"
+    (pageChange)="onPageChange($event)">
+  </app-pagination>
+</div>
