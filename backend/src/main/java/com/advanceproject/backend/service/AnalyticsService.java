@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -153,18 +154,16 @@ public class AnalyticsService {
 
     public Map<String, Object> getCorporateAnalytics(Integer ownerId, LocalDate fromDate, LocalDate toDate) {
         Map<String, Object> result = new LinkedHashMap<>();
-        Object[] ownerAndDateArgs = ownerAndDateArgs(ownerId, fromDate, toDate);
 
-        result.put("summary", safeQueryForMap("""
+        QueryWithArgs summaryQuery = withOptionalDateFilters("""
                 SELECT
                     COUNT(*) AS order_count,
                     COALESCE(SUM(o.grand_total), 0) AS total_revenue
                 FROM orders o
                 JOIN stores s ON s.id = o.store_id
                 WHERE s.owner_id = ?
-                  AND (? IS NULL OR DATE(o.order_date) >= ?)
-                  AND (? IS NULL OR DATE(o.order_date) <= ?)
-                """, ownerAndDateArgs));
+                """, ownerId, fromDate, toDate);
+        result.put("summary", safeQueryForMap(summaryQuery.sql(), summaryQuery.args()));
 
         result.put("products", safeQueryForMap("""
                 SELECT
@@ -175,7 +174,7 @@ public class AnalyticsService {
                 WHERE s.owner_id = ?
                 """, ownerId));
 
-        result.put("recentOrders", safeQueryForList("""
+        QueryWithArgs recentOrdersQuery = withOptionalDateFilters("""
                 SELECT
                     o.id,
                     o.order_date,
@@ -193,13 +192,12 @@ public class AnalyticsService {
                 ) sh ON true
                 JOIN users u ON u.id = o.user_id
                 WHERE s.owner_id = ?
-                  AND (? IS NULL OR DATE(o.order_date) >= ?)
-                  AND (? IS NULL OR DATE(o.order_date) <= ?)
                 ORDER BY o.order_date DESC
                 LIMIT 5
-                """, ownerAndDateArgs));
+                """, ownerId, fromDate, toDate);
+        result.put("recentOrders", safeQueryForList(recentOrdersQuery.sql(), recentOrdersQuery.args()));
 
-        result.put("monthlyRevenue", safeQueryForList("""
+        QueryWithArgs monthlyRevenueQuery = withOptionalDateFilters("""
                 SELECT
                     EXTRACT(MONTH FROM o.order_date) AS month,
                     COALESCE(SUM(o.grand_total), 0) AS revenue
@@ -207,13 +205,12 @@ public class AnalyticsService {
                 JOIN stores s ON s.id = o.store_id
                 WHERE s.owner_id = ?
                   AND o.order_date IS NOT NULL
-                  AND (? IS NULL OR DATE(o.order_date) >= ?)
-                  AND (? IS NULL OR DATE(o.order_date) <= ?)
                 GROUP BY EXTRACT(MONTH FROM o.order_date)
                 ORDER BY month
-                """, ownerAndDateArgs));
+                """, ownerId, fromDate, toDate);
+        result.put("monthlyRevenue", safeQueryForList(monthlyRevenueQuery.sql(), monthlyRevenueQuery.args()));
 
-        result.put("customerSegments", safeQueryForList("""
+        QueryWithArgs customerSegmentsQuery = withOptionalDateFilters("""
                 SELECT
                     COALESCE(cp.membership_type, 'Standard') AS segment,
                     COUNT(DISTINCT o.user_id) AS customer_count,
@@ -222,13 +219,12 @@ public class AnalyticsService {
                 JOIN stores s ON s.id = o.store_id
                 LEFT JOIN customer_profiles cp ON cp.user_id = o.user_id
                 WHERE s.owner_id = ?
-                  AND (? IS NULL OR DATE(o.order_date) >= ?)
-                  AND (? IS NULL OR DATE(o.order_date) <= ?)
                 GROUP BY COALESCE(cp.membership_type, 'Standard')
                 ORDER BY revenue DESC
-                """, ownerAndDateArgs));
+                """, ownerId, fromDate, toDate);
+        result.put("customerSegments", safeQueryForList(customerSegmentsQuery.sql(), customerSegmentsQuery.args()));
 
-        result.put("revenueByCategory", safeQueryForList("""
+        QueryWithArgs revenueByCategoryQuery = withOptionalDateFilters("""
                 SELECT
                     COALESCE(c.name, 'Diger') AS name,
                     COALESCE(SUM(oi.quantity), 0) AS sold_count,
@@ -239,20 +235,32 @@ public class AnalyticsService {
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN categories c ON c.id = p.category_id
                 WHERE s.owner_id = ?
-                  AND (? IS NULL OR DATE(o.order_date) >= ?)
-                  AND (? IS NULL OR DATE(o.order_date) <= ?)
                 GROUP BY COALESCE(c.name, 'Diger')
                 ORDER BY revenue DESC
                 LIMIT 8
-                """, ownerAndDateArgs));
+                """, ownerId, fromDate, toDate);
+        result.put("revenueByCategory", safeQueryForList(revenueByCategoryQuery.sql(), revenueByCategoryQuery.args()));
 
         return result;
     }
 
-    private Object[] ownerAndDateArgs(Integer ownerId, LocalDate fromDate, LocalDate toDate) {
-        Date fromSql = fromDate != null ? Date.valueOf(fromDate) : null;
-        Date toSql = toDate != null ? Date.valueOf(toDate) : null;
-        return new Object[]{ownerId, fromSql, fromSql, toSql, toSql};
+    private QueryWithArgs withOptionalDateFilters(String baseSql, Integer ownerId, LocalDate fromDate, LocalDate toDate) {
+        StringBuilder sql = new StringBuilder(baseSql);
+        List<Object> args = new ArrayList<>();
+        args.add(ownerId);
+
+        if (fromDate != null) {
+            sql.append(" AND DATE(o.order_date) >= ?");
+            args.add(Date.valueOf(fromDate));
+        }
+        if (toDate != null) {
+            sql.append(" AND DATE(o.order_date) <= ?");
+            args.add(Date.valueOf(toDate));
+        }
+        return new QueryWithArgs(sql.toString(), args.toArray());
+    }
+
+    private record QueryWithArgs(String sql, Object[] args) {
     }
 
     public Map<String, Object> getIndividualAnalytics(Integer userId) {
