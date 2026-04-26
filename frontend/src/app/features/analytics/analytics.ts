@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
 
 Chart.register(...registerables);
 
@@ -37,10 +38,10 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
   private chartsReady = false;
   private charts: Chart[] = [];
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  constructor(private api: ApiService, private auth: AuthService, private toast: ToastService) {}
 
   ngOnInit(): void {
-    this.isCorporate.set(this.auth.hasRole('CORPORATE'));
+    this.syncRole();
     this.loadData();
   }
 
@@ -49,9 +50,10 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
     this.renderCharts();
   }
 
-  loadData(): void {
+  loadData(endpointOverride?: string, isRetry = false): void {
+    this.syncRole();
     this.loading.set(true);
-    const endpoint = this.isCorporate() ? 'analytics/corporate' : 'analytics/admin';
+    const endpoint = endpointOverride || (this.isCorporate() ? 'analytics/corporate' : 'analytics/admin');
     const params: Record<string, string> = {};
     if (this.isCorporate() && this.fromDate()) {
       params['fromDate'] = this.fromDate();
@@ -66,8 +68,15 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
         this.loading.set(false);
         setTimeout(() => this.renderCharts(), 0);
       },
-      error: () => {
+      error: (err) => {
+        if (!isRetry && (err?.status === 401 || err?.status === 403) && this.resolveRole() !== 'INDIVIDUAL') {
+          const fallbackEndpoint = endpoint === 'analytics/corporate' ? 'analytics/admin' : 'analytics/corporate';
+          this.loadData(fallbackEndpoint, true);
+          return;
+        }
         this.loading.set(false);
+        const msg = err?.error?.message || err?.error?.error || err?.message || 'Bilinmeyen hata';
+        this.toast.error(`Analitik verileri yuklenemedi: ${msg}`);
       }
     });
   }
@@ -384,5 +393,16 @@ export class AnalyticsComponent implements OnInit, AfterViewInit {
 
   private normalize(value: string | null | undefined): string {
     return (value || '').toLowerCase();
+  }
+
+  private resolveRole(): 'ADMIN' | 'CORPORATE' | 'INDIVIDUAL' {
+    const raw = (this.auth.user()?.roleType || '').trim().toUpperCase();
+    if (raw.includes('ADMIN')) return 'ADMIN';
+    if (raw.includes('CORPORATE')) return 'CORPORATE';
+    return 'INDIVIDUAL';
+  }
+
+  private syncRole(): void {
+    this.isCorporate.set(this.resolveRole() === 'CORPORATE');
   }
 }
