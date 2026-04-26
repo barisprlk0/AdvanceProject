@@ -69,10 +69,18 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Integer id) {
-        return productService.getProductById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Product> getProductById(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Product product = productService.getProductById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        if ("CORPORATE".equalsIgnoreCase(user.getRoleType()) && !ownsProduct(user, product)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(product);
     }
 
     @PutMapping("/{id}")
@@ -85,8 +93,7 @@ public class ProductController {
 
         if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
             // Corporate users can only edit their own products
-            if (existingProduct.getStore() == null || existingProduct.getStore().getOwner() == null || 
-                !existingProduct.getStore().getOwner().getId().equals(user.getId())) {
+            if (!ownsProduct(user, existingProduct)) {
                 return ResponseEntity.status(403).build();
             }
             if (product.getStore() != null && product.getStore().getId() != null) {
@@ -96,6 +103,8 @@ public class ProductController {
                     return ResponseEntity.status(403).build();
                 }
                 product.setStore(requestedStore);
+            } else {
+                product.setStore(existingProduct.getStore());
             }
         }
         
@@ -111,8 +120,7 @@ public class ProductController {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
         if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
-            if (existingProduct.getStore() == null || existingProduct.getStore().getOwner() == null ||
-                !existingProduct.getStore().getOwner().getId().equals(user.getId())) {
+            if (!ownsProduct(user, existingProduct)) {
                 return ResponseEntity.status(403).build();
             }
             if (product.getStore() != null && product.getStore().getId() != null) {
@@ -137,13 +145,18 @@ public class ProductController {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
         if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
-            if (existingProduct.getStore() == null || existingProduct.getStore().getOwner() == null || 
-                !existingProduct.getStore().getOwner().getId().equals(user.getId())) {
+            if (!ownsProduct(user, existingProduct)) {
                 return ResponseEntity.status(403).build();
             }
         }
         
         productService.deleteProduct(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean ownsProduct(User user, Product product) {
+        return product.getStore() != null
+                && product.getStore().getOwner() != null
+                && product.getStore().getOwner().getId().equals(user.getId());
     }
 }

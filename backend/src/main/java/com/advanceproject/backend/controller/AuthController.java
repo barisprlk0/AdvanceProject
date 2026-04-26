@@ -8,14 +8,18 @@ import com.advanceproject.backend.entity.User;
 import com.advanceproject.backend.security.JwtUtil;
 import com.advanceproject.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -78,7 +82,7 @@ public class AuthController {
         User newUser = new User();
         newUser.setEmail(email);
         newUser.setPasswordHash(passwordEncoder.encode(password));
-        newUser.setRoleType(registerRequest.getRoleType() != null ? registerRequest.getRoleType() : "Individual");
+        newUser.setRoleType(resolveSelfRegistrationRole(registerRequest.getRoleType()));
         newUser.setGender(registerRequest.getGender());
 
         User savedUser = userService.registerUser(newUser);
@@ -127,5 +131,18 @@ public class AuthController {
                 user.getRoleType(),
                 user.getGender()
         ));
+    }
+
+    private String resolveSelfRegistrationRole(String requestedRole) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return "INDIVIDUAL";
+        }
+
+        String normalized = requestedRole.trim().toUpperCase(Locale.ROOT);
+        if ("INDIVIDUAL".equals(normalized) || "CORPORATE".equals(normalized)) {
+            return normalized;
+        }
+
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This role cannot be assigned during self-registration.");
     }
 }

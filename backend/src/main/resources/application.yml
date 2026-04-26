@@ -26,9 +26,9 @@ jwt:
   refresh-expiration: 1209600000 # 14 days in milliseconds
 
 ai:
-  openai:
-    api-key: ${OPENAI_API_KEY:}
-    model: ${OPENAI_MODEL:gpt-4o-mini}
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-flash-latest}
   chat:
     max-rows: 200
     max-retries: 3

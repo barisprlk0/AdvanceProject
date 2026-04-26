@@ -52,10 +52,18 @@ public class StoreController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Store> getStoreById(@PathVariable Integer id) {
-        return storeService.getStoreById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Store> getStoreById(@PathVariable Integer id, Authentication authentication) {
+        User user = userService.getUserByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Store store = storeService.getStoreById(id)
+                .orElseThrow(() -> new RuntimeException("Store not found"));
+
+        if (!canAccessStore(user, store)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(store);
     }
 
     @PutMapping("/{id}")
@@ -66,8 +74,11 @@ public class StoreController {
         Store existingStore = storeService.getStoreById(id)
                 .orElseThrow(() -> new RuntimeException("Store not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !existingStore.getOwner().getId().equals(user.getId())) {
+        if (!canAccessStore(user, existingStore)) {
             return ResponseEntity.status(403).build();
+        }
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            store.setOwner(existingStore.getOwner());
         }
 
         return ResponseEntity.ok(storeService.updateStore(id, store));
@@ -81,7 +92,7 @@ public class StoreController {
         Store existingStore = storeService.getStoreById(id)
                 .orElseThrow(() -> new RuntimeException("Store not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !existingStore.getOwner().getId().equals(user.getId())) {
+        if (!canAccessStore(user, existingStore)) {
             return ResponseEntity.status(403).build();
         }
 
@@ -100,11 +111,16 @@ public class StoreController {
         Store existingStore = storeService.getStoreById(id)
                 .orElseThrow(() -> new RuntimeException("Store not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && !existingStore.getOwner().getId().equals(user.getId())) {
+        if (!canAccessStore(user, existingStore)) {
             return ResponseEntity.status(403).build();
         }
 
         storeService.deleteStore(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean canAccessStore(User user, Store store) {
+        return "ADMIN".equalsIgnoreCase(user.getRoleType())
+                || (store.getOwner() != null && store.getOwner().getId().equals(user.getId()));
     }
 }

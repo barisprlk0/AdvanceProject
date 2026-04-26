@@ -90,10 +90,11 @@ public class ReviewController {
         Review existingReview = reviewService.getReviewById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && 
-            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
+        if (!canManageReview(user, existingReview)) {
             return ResponseEntity.status(403).build();
         }
+        review.setUser(existingReview.getUser());
+        review.setProduct(existingReview.getProduct());
 
         return ResponseEntity.ok(reviewService.updateReview(id, review));
     }
@@ -106,16 +107,11 @@ public class ReviewController {
         Review existingReview = reviewService.getReviewById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) &&
-            !"CORPORATE".equalsIgnoreCase(user.getRoleType()) &&
-            !existingReview.getUser().getId().equals(user.getId())) {
+        if (!canManageReview(user, existingReview)) {
             return ResponseEntity.status(403).build();
         }
-
-        if ("CORPORATE".equalsIgnoreCase(user.getRoleType()) &&
-            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).build();
-        }
+        review.setUser(null);
+        review.setProduct(null);
 
         return ResponseEntity.ok(reviewService.patchReview(id, review));
     }
@@ -144,12 +140,24 @@ public class ReviewController {
         Review existingReview = reviewService.getReviewById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found"));
 
-        if (!"ADMIN".equalsIgnoreCase(user.getRoleType()) && 
-            !existingReview.getProduct().getStore().getOwner().getId().equals(user.getId())) {
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
             return ResponseEntity.status(403).build();
         }
 
         reviewService.deleteReview(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean canManageReview(User user, Review review) {
+        if ("ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            return true;
+        }
+        if ("CORPORATE".equalsIgnoreCase(user.getRoleType())) {
+            return review.getProduct() != null
+                    && review.getProduct().getStore() != null
+                    && review.getProduct().getStore().getOwner() != null
+                    && review.getProduct().getStore().getOwner().getId().equals(user.getId());
+        }
+        return review.getUser() != null && review.getUser().getId().equals(user.getId());
     }
 }
