@@ -24,3 +24,11 @@ jwt:
   secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a756b5c3d4e5f6
   expiration: 36000000 # 10 hours in milliseconds
   refresh-expiration: 1209600000 # 14 days in milliseconds
+
+ai:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+  chat:
+    max-rows: 200
+    max-retries: 3
