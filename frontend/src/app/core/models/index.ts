@@ -158,6 +158,8 @@ export interface ChatAskResponse {
   finalAnswer: string;
   sqlQuery?: string;
   rejectionReason?: string;
+  blocked?: boolean;
+  sqlGenerated?: boolean;
   retryCount: number;
   rows: Record<string, unknown>[];
   chart?: ChatChartData;

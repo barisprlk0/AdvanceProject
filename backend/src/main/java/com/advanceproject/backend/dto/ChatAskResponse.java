@@ -15,6 +15,8 @@ public class ChatAskResponse {
     private String finalAnswer;
     private String sqlQuery;
     private String rejectionReason;
+    private boolean blocked;
+    private boolean sqlGenerated;
     private int retryCount;
     private List<Map<String, Object>> rows;
     private ChatChartData chart;

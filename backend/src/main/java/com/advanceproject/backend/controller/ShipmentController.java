@@ -97,6 +97,9 @@ public class ShipmentController {
         if (!canManageShipment(user, existingShipment)) {
             return ResponseEntity.status(403).build();
         }
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            shipment.setOrder(existingShipment.getOrder());
+        }
 
         return ResponseEntity.ok(shipmentService.updateShipment(id, shipment));
     }
@@ -111,6 +114,9 @@ public class ShipmentController {
 
         if (!canManageShipment(user, existingShipment)) {
             return ResponseEntity.status(403).build();
+        }
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            partialShipment.setOrder(null);
         }
 
         return ResponseEntity.ok(shipmentService.patchShipment(id, partialShipment));

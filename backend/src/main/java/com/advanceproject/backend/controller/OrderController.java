@@ -79,6 +79,11 @@ public class OrderController {
         if (!canManageOrder(user, existingOrder)) {
             return ResponseEntity.status(403).build();
         }
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            order.setUser(existingOrder.getUser());
+            order.setStore(existingOrder.getStore());
+            order.setGrandTotal(existingOrder.getGrandTotal());
+        }
 
         return ResponseEntity.ok(orderService.updateOrder(id, order));
     }
@@ -93,6 +98,11 @@ public class OrderController {
 
         if (!canManageOrder(user, existingOrder)) {
             return ResponseEntity.status(403).build();
+        }
+        if (!"ADMIN".equalsIgnoreCase(user.getRoleType())) {
+            partialOrder.setUser(null);
+            partialOrder.setStore(null);
+            partialOrder.setGrandTotal(null);
         }
 
         return ResponseEntity.ok(orderService.patchOrder(id, partialOrder));

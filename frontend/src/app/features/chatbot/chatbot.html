@@ -86,13 +86,12 @@
         }
       </div>
 
-      @if (messages().length <= 1) {
-        <div class="suggestions">
-          @for (suggestion of suggestions(); track suggestion) {
-            <button class="suggestion-btn" (click)="sendMessage(suggestion)">{{ suggestion }}</button>
-          }
-        </div>
-      }
+      <div class="suggestions">
+        <div class="suggestions-header">Test Questions (20) — click to send</div>
+        @for (suggestion of suggestions(); track suggestion) {
+          <button class="suggestion-btn" (click)="sendMessage(suggestion)">{{ suggestion }}</button>
+        }
+      </div>
 
       <div class="chat-input-area">
         <div class="chat-input-wrapper">

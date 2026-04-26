@@ -16,6 +16,6 @@ public class RegisterRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
-    private String roleType; // "Individual", "Corporate", "Admin"
+    private String roleType; // Self-registration allows only "Individual" or "Corporate".
     private String gender;
 }
