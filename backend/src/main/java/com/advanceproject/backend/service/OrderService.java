@@ -56,6 +56,10 @@ public class OrderService {
             com.advanceproject.backend.entity.Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
 
+            if (product.getStore() == null || !store.getId().equals(product.getStore().getId())) {
+                throw new RuntimeException("Product does not belong to this store: " + product.getName());
+            }
+
             // Check stock
             if (product.getStockQuantity() != null && product.getStockQuantity() < itemReq.getQuantity()) {
                 throw new RuntimeException("Insufficient stock for product: " + product.getName());

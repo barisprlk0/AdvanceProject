@@ -1,44 +1,50 @@
 import { Component, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe } from '@angular/common';
 import { CartService } from '../../core/services/cart.service';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 
+interface CheckoutOrderPayload {
+  storeId: number;
+  paymentMethod: string;
+  items: { productId: number; quantity: number }[];
+}
+
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [RouterLink, FormsModule, CurrencyPipe],
+  imports: [FormsModule, CurrencyPipe],
   template: `
     <div class="fade-in">
       <div class="page-header">
-        <h1 class="page-title">Siparişi Tamamla</h1>
-        <p class="page-subtitle">Ödeme yöntemi seçin ve siparişinizi onaylayın</p>
+        <h1 class="page-title">Siparisi Tamamla</h1>
+        <p class="page-subtitle">Odeme yontemi secin ve siparisinizi onaylayin</p>
       </div>
 
       <div class="checkout-grid">
         <div class="checkout-form-column">
           <div class="card">
-            <h2 class="card-title">Ödeme Yöntemi</h2>
+            <h2 class="card-title">Odeme Yontemi</h2>
             <div class="payment-options">
               <label class="payment-option" [class.active]="paymentMethod() === 'Credit Card'">
                 <input type="radio" name="payment" [(ngModel)]="paymentMethod" value="Credit Card">
                 <div class="option-content">
-                  <div class="option-icon">💳</div>
+                  <div class="option-icon">Card</div>
                   <div class="option-text">
-                    <strong>Kredi Kartı</strong>
-                    <p>Güvenli ödeme altyapısı ile ödeyin</p>
+                    <strong>Kredi Karti</strong>
+                    <p>Stripe Checkout ile guvenli odeme alinacak</p>
                   </div>
                 </div>
               </label>
               <label class="payment-option" [class.active]="paymentMethod() === 'Cash on Delivery'">
                 <input type="radio" name="payment" [(ngModel)]="paymentMethod" value="Cash on Delivery">
                 <div class="option-content">
-                  <div class="option-icon">💵</div>
+                  <div class="option-icon">Cash</div>
                   <div class="option-text">
-                    <strong>Kapıda Ödeme</strong>
-                    <p>Ürünü teslim alırken nakit veya kartla ödeyin</p>
+                    <strong>Kapida Odeme</strong>
+                    <p>Urunu teslim alirken nakit veya kartla odeyin</p>
                   </div>
                 </div>
               </label>
@@ -47,7 +53,7 @@ import { ToastService } from '../../core/services/toast.service';
             @if (paymentMethod() === 'Credit Card') {
               <div class="stripe-note">
                 <div class="alert alert-info">
-                  <strong>Bilgi:</strong> Bir sonraki aşamada Stripe entegrasyonu eklenecektir. Şu an simülasyon olarak onaylanmaktadır.
+                  <strong>Stripe:</strong> Kart bilgileri uygulamada tutulmaz; odeme Stripe'in guvenli sayfasinda tamamlanir.
                 </div>
               </div>
             }
@@ -56,7 +62,7 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="checkout-summary-column">
           <div class="card summary-card">
-            <h2 class="card-title">Sipariş Özeti</h2>
+            <h2 class="card-title">Siparis Ozeti</h2>
             <div class="items-preview">
               @for (item of cart.items(); track item.product.id) {
                 <div class="item-line">
@@ -72,9 +78,11 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
             <button class="btn btn-primary btn-lg checkout-btn" (click)="confirmOrder()" [disabled]="loading()">
               @if (loading()) {
-                <span class="spinner spinner-sm"></span> Onaylanıyor...
+                <span class="spinner spinner-sm"></span> Isleniyor...
+              } @else if (paymentMethod() === 'Credit Card') {
+                Stripe ile Ode
               } @else {
-                Siparişi Onayla
+                Siparisi Onayla
               }
             </button>
           </div>
@@ -89,20 +97,20 @@ import { ToastService } from '../../core/services/toast.service';
     .payment-option input { position: absolute; opacity: 0; }
     .payment-option.active { border-color: var(--primary); background: var(--primary-light); }
     .option-content { display: flex; gap: 16px; align-items: center; }
-    .option-icon { font-size: 1.5rem; }
+    .option-icon { min-width: 42px; height: 42px; border-radius: var(--radius-md); background: var(--surface-alt); display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; color: var(--primary); }
     .option-text strong { display: block; margin-bottom: 2px; }
     .option-text p { font-size: 0.8125rem; color: var(--text-muted); margin: 0; }
-    
+
     .stripe-note { margin-top: 24px; }
     .alert { padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.875rem; }
     .alert-info { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
 
     .items-preview { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-    .item-line { display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--text-secondary); }
+    .item-line { display: flex; justify-content: space-between; gap: 16px; font-size: 0.875rem; color: var(--text-secondary); }
     .summary-card { padding: 24px; }
     .total-row { font-weight: 700; font-size: 1.125rem; margin-top: 8px; color: var(--text-primary); }
     .checkout-btn { width: 100%; margin-top: 20px; height: 54px; }
-    
+
     @media (max-width: 992px) { .checkout-grid { grid-template-columns: 1fr; } }
   `
 })
@@ -115,19 +123,44 @@ export class CheckoutComponent {
     public cart: CartService,
     private api: ApiService,
     private toast: ToastService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
+    const stripeSessionId = this.route.snapshot.queryParamMap.get('stripeSessionId');
+    if (stripeSessionId) {
+      this.completeStripePayment(stripeSessionId);
+      return;
+    }
+
+    if (this.route.snapshot.queryParamMap.get('stripeCanceled')) {
+      this.toast.error('Stripe odemesi iptal edildi.');
+    }
+
     if (this.cart.items().length === 0) {
       this.router.navigate(['/app/cart']);
     }
   }
 
   confirmOrder() {
+    if (this.loading()) {
+      return;
+    }
     this.loading.set(true);
-    
-    // Group items by store (backend Order needs storeId)
-    // For simplicity, we create one order per store in the cart
-    const itemsByStore = new Map<number, any[]>();
+
+    const orders = this.buildOrderPayloads(
+      this.paymentMethod() === 'Credit Card' ? 'Stripe' : this.paymentMethod()
+    );
+
+    if (this.paymentMethod() === 'Credit Card') {
+      this.startStripeCheckout(orders);
+      return;
+    }
+
+    this.createOrders(orders);
+  }
+
+  private buildOrderPayloads(paymentMethod: string): CheckoutOrderPayload[] {
+    const itemsByStore = new Map<number, { productId: number; quantity: number }[]>();
     this.cart.items().forEach(item => {
       const storeId = item.product.store?.id || 1;
       if (!itemsByStore.has(storeId)) itemsByStore.set(storeId, []);
@@ -137,25 +170,72 @@ export class CheckoutComponent {
       });
     });
 
-    const orderPromises = Array.from(itemsByStore.entries()).map(([storeId, items]) => {
-      const request = {
-        storeId,
-        paymentMethod: this.paymentMethod(),
-        items
-      };
-      return this.api.create('orders', request).toPromise();
-    });
+    return Array.from(itemsByStore.entries()).map(([storeId, items]) => ({
+      storeId,
+      paymentMethod,
+      items
+    }));
+  }
+
+  private startStripeCheckout(orders: CheckoutOrderPayload[]) {
+    this.api.postEndpoint<{ sessionId: string; checkoutUrl: string }>('payments/checkout-session', { orders })
+      .subscribe({
+        next: response => {
+          localStorage.setItem('pendingStripeSessionId', response.sessionId);
+          window.location.href = response.checkoutUrl;
+        },
+        error: err => {
+          console.error(err);
+          this.toast.error(this.errorMessage(err, 'Stripe odemesi baslatilamadi.'));
+          this.loading.set(false);
+        }
+      });
+  }
+
+  private completeStripePayment(sessionId: string) {
+    this.loading.set(true);
+    const pendingSessionId = localStorage.getItem('pendingStripeSessionId');
+
+    if (pendingSessionId !== sessionId) {
+      this.toast.error('Tamamlanacak bekleyen Stripe odemesi bulunamadi.');
+      this.loading.set(false);
+      this.router.navigate(['/app/cart']);
+      return;
+    }
+
+    this.api.postEndpoint('payments/complete', { sessionId })
+      .subscribe({
+        next: () => {
+          localStorage.removeItem('pendingStripeSessionId');
+          this.toast.success('Stripe odemesi alindi ve siparisiniz olusturuldu!');
+          this.cart.clearCart();
+          this.router.navigate(['/app/orders']);
+        },
+        error: err => {
+          console.error(err);
+          this.toast.error(this.errorMessage(err, 'Stripe odemesi dogrulanirken bir hata olustu.'));
+          this.loading.set(false);
+        }
+      });
+  }
+
+  private createOrders(orders: CheckoutOrderPayload[]) {
+    const orderPromises = orders.map(request => this.api.create('orders', request).toPromise());
 
     Promise.all(orderPromises)
       .then(() => {
-        this.toast.success('Siparişiniz başarıyla alındı!');
+        this.toast.success('Siparisiniz basariyla alindi!');
         this.cart.clearCart();
         this.router.navigate(['/app/orders']);
       })
       .catch((err) => {
         console.error(err);
-        this.toast.error('Sipariş oluşturulurken bir hata oluştu.');
+        this.toast.error(this.errorMessage(err, 'Siparis olusturulurken bir hata olustu.'));
       })
       .finally(() => this.loading.set(false));
+  }
+
+  private errorMessage(err: any, fallback: string): string {
+    return err?.error?.message || err?.message || fallback;
   }
 }
