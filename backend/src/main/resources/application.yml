@@ -27,8 +27,14 @@ jwt:
 
 ai:
   gemini:
-    api-key: ${GEMINI_API_KEY:}
+    api-key: AIzaSyA2WwgdNT1tPj_3TWhMynGAH71PKEDkLoY
     model: ${GEMINI_MODEL:gemini-flash-latest}
   chat:
     max-rows: 200
     max-retries: 3
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:}
+  currency: ${STRIPE_CURRENCY:try}
+  success-url: "${STRIPE_SUCCESS_URL:http://localhost:4200/app/checkout?stripeSessionId={CHECKOUT_SESSION_ID}}"
+  cancel-url: "${STRIPE_CANCEL_URL:http://localhost:4200/app/checkout?stripeCanceled=true}"

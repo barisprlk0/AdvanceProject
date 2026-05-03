@@ -92,6 +92,23 @@ class MultiAgentChatServiceTest {
     }
 
     @Test
+    void blocksSellerOnlyProductAnalyticsForIndividualUsers() {
+        ChatAskResponse response = service.ask(
+                request("Bu ay en cok satan 5 urunum ne?"),
+                user("INDIVIDUAL")
+        );
+
+        assertThat(response.isInScope()).isFalse();
+        assertThat(response.isBlocked()).isTrue();
+        assertThat(response.isSqlGenerated()).isFalse();
+        assertThat(response.getRejectionReason()).isEqualTo("Seller analytics access");
+        assertThat(response.getSqlQuery()).isNull();
+        assertThat(response.getFinalAnswer()).contains("corporate seller account");
+        verifyNoInteractions(jdbcTemplate);
+        verify(geminiChatClient, never()).complete(anyString(), anyString());
+    }
+
+    @Test
     void usesStableTemplateForSalesByCategoryQuestion() {
         when(jdbcTemplate.queryForList(anyString(), any(MapSqlParameterSource.class)))
                 .thenReturn(List.of(
@@ -175,6 +192,29 @@ class MultiAgentChatServiceTest {
         assertThat(response.getChart()).isNull();
         assertThat(sqlCaptor.getValue()).contains("LIMIT 20");
         assertThat(sqlCaptor.getValue()).doesNotContain("LIMIT 20 LIMIT");
+    }
+
+    @Test
+    void usesTodayFilterForTurkishCustomerOrderListPrompt() {
+        when(jdbcTemplate.queryForList(anyString(), any(MapSqlParameterSource.class)))
+                .thenReturn(List.of(
+                        row("ordered_product_names", "Prod-TLUYA")
+                ));
+
+        ChatAskResponse response = service.ask(request("Bugun verdigim siparisler neler?"), user("INDIVIDUAL"));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForList(sqlCaptor.capture(), any(MapSqlParameterSource.class));
+
+        assertThat(response.getFinalAnswer()).isEqualTo("Bugun siparis verdigin urunler: Prod-TLUYA");
+        assertThat(response.getChart()).isNull();
+        assertThat(sqlCaptor.getValue()).contains("FROM scoped_orders o");
+        assertThat(sqlCaptor.getValue()).contains("JOIN scoped_order_items oi ON oi.order_id = o.id");
+        assertThat(sqlCaptor.getValue()).contains("JOIN scoped_products p ON p.id = oi.product_id");
+        assertThat(sqlCaptor.getValue()).contains("ordered_product_names");
+        assertThat(sqlCaptor.getValue()).contains("order_date >= CURRENT_DATE");
+        assertThat(sqlCaptor.getValue()).contains("order_date < CURRENT_DATE + INTERVAL '1 day'");
+        assertThat(sqlCaptor.getValue()).contains("WHERE user_id = :userId");
     }
 
     @Test

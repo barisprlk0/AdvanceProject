@@ -204,6 +204,17 @@ public class MultiAgentChatService {
             return;
         }
 
+        if ("INDIVIDUAL".equals(state.getRoleType()) && asksSellerOnlyAnalytics(q)) {
+            blockRequest(
+                    state,
+                    user,
+                    "Seller analytics access",
+                    "Individual user requested seller-only analytics",
+                    "This question requires a corporate seller account. Individual users can ask about their own orders, purchased products, reviews, or shipments."
+            );
+            return;
+        }
+
         if (SQLI_INTENT_PATTERN.matcher(q).find()) {
             blockRequest(
                     state,
@@ -318,6 +329,16 @@ public class MultiAgentChatService {
         List<Map<String, Object>> rows = state.getQueryResult();
         if (rows == null || rows.isEmpty()) {
             state.setFinalAnswer("No data matched this question in your role scope.");
+            return;
+        }
+
+        if (rows.get(0).containsKey("ordered_product_names")) {
+            Object products = rows.get(0).get("ordered_product_names");
+            if (products == null || products.toString().isBlank()) {
+                state.setFinalAnswer("Bugun siparis verdigin urun bulunamadi.");
+                return;
+            }
+            state.setFinalAnswer("Bugun siparis verdigin urunler: " + products);
             return;
         }
 
@@ -670,17 +691,20 @@ public class MultiAgentChatService {
                     """;
         }
 
+        if (asksToday(q)
+                && containsAny(q, "order", "orders", "siparis", "siparisler")
+                && asksForOrderList(q)) {
+            return todayOrderedProductsSql();
+        }
+
         if ((q.contains("how many") || q.contains("kac"))
                 && (q.contains("order") || q.contains("siparis"))
-                && (q.contains("today") || q.contains("bugun"))) {
+                && asksToday(q)) {
             return """
                     SELECT COUNT(*) AS order_count_today
                     FROM scoped_orders
-                    WHERE DATE(order_date) = (
-                        SELECT MAX(DATE(order_date))
-                        FROM scoped_orders
-                        WHERE order_date IS NOT NULL
-                    )
+                    WHERE order_date >= CURRENT_DATE
+                      AND order_date < CURRENT_DATE + INTERVAL '1 day'
                     """;
         }
 
@@ -1014,6 +1038,22 @@ public class MultiAgentChatService {
                 """;
     }
 
+    private String todayOrderedProductsSql() {
+        return """
+                SELECT STRING_AGG(product_name, ', ' ORDER BY latest_order_date DESC, product_name) AS ordered_product_names
+                FROM (
+                    SELECT p.name AS product_name,
+                           MAX(o.order_date) AS latest_order_date
+                    FROM scoped_orders o
+                    JOIN scoped_order_items oi ON oi.order_id = o.id
+                    JOIN scoped_products p ON p.id = oi.product_id
+                    WHERE o.order_date >= CURRENT_DATE
+                      AND o.order_date < CURRENT_DATE + INTERVAL '1 day'
+                    GROUP BY p.name
+                ) today_products
+                """;
+    }
+
     private String monthComparisonSql() {
         return """
                 WITH month_scope AS (
@@ -1070,6 +1110,30 @@ public class MultiAgentChatService {
         return productTerm && soldMostTerm;
     }
 
+    private boolean asksSellerOnlyAnalytics(String q) {
+        if (asksForMostSoldProducts(q)) {
+            return true;
+        }
+
+        boolean productOrStoreOwnership = containsAny(q,
+                "my product", "my products", "urunum", "urunlerim", "magazam", "magazamdaki", "store", "magaza");
+        boolean sellerMetric = containsAny(q,
+                "sold", "selling", "sales", "revenue", "stock", "inventory",
+                "satan", "satilan", "satis", "ciro", "gelir", "stok");
+        if (productOrStoreOwnership && sellerMetric) {
+            return true;
+        }
+
+        boolean customerAnalytics = containsAny(q, "customer", "customers", "musteri", "musteriler")
+                && containsAny(q, "top", "valuable", "distribution", "degerli", "dagilim", "en iyi");
+        boolean storeAnalytics = containsAny(q, "store", "stores", "magaza", "magazalar")
+                && containsAny(q, "sales", "revenue", "compare", "ciro", "gelir", "satis", "karsilastir");
+        boolean inventoryAnalytics = containsAny(q, "stock", "inventory", "stok")
+                && containsAny(q, "product", "products", "urun", "urunler");
+
+        return customerAnalytics || storeAnalytics || inventoryAnalytics;
+    }
+
     private boolean asksCurrentMonth(String q) {
         return q.contains("this month")
                 || q.contains("bu ay")
@@ -1082,6 +1146,27 @@ public class MultiAgentChatService {
                 || q.contains("previous month")
                 || q.contains("gecen ay")
                 || q.contains("onceki ay");
+    }
+
+    private boolean asksToday(String q) {
+        return q.contains("today")
+                || q.contains("bugun");
+    }
+
+    private boolean asksForOrderList(String q) {
+        return q.contains("list")
+                || q.contains("show")
+                || q.contains("recent")
+                || q.contains("latest")
+                || q.contains("what")
+                || q.contains("which")
+                || q.contains("listele")
+                || q.contains("goster")
+                || q.contains("neler")
+                || q.contains("hangi")
+                || q.contains("verdigim")
+                || q.contains("verdigi")
+                || q.contains("placed");
     }
 
     private boolean asksAcrossStores(String q) {
