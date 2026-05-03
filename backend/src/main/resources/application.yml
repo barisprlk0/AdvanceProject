@@ -27,7 +27,7 @@ jwt:
 
 ai:
   gemini:
-    api-key: ${GEMINI_API_KEY:}
+    api-key: AIzaSyA2WwgdNT1tPj_3TWhMynGAH71PKEDkLoY
     model: ${GEMINI_MODEL:gemini-flash-latest}
   chat:
     max-rows: 200

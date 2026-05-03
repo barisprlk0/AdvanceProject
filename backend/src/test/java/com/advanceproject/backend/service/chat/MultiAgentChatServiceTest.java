@@ -92,6 +92,23 @@ class MultiAgentChatServiceTest {
     }
 
     @Test
+    void blocksSellerOnlyProductAnalyticsForIndividualUsers() {
+        ChatAskResponse response = service.ask(
+                request("Bu ay en cok satan 5 urunum ne?"),
+                user("INDIVIDUAL")
+        );
+
+        assertThat(response.isInScope()).isFalse();
+        assertThat(response.isBlocked()).isTrue();
+        assertThat(response.isSqlGenerated()).isFalse();
+        assertThat(response.getRejectionReason()).isEqualTo("Seller analytics access");
+        assertThat(response.getSqlQuery()).isNull();
+        assertThat(response.getFinalAnswer()).contains("corporate seller account");
+        verifyNoInteractions(jdbcTemplate);
+        verify(geminiChatClient, never()).complete(anyString(), anyString());
+    }
+
+    @Test
     void usesStableTemplateForSalesByCategoryQuestion() {
         when(jdbcTemplate.queryForList(anyString(), any(MapSqlParameterSource.class)))
                 .thenReturn(List.of(
