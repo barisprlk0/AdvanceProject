@@ -204,6 +204,17 @@ public class MultiAgentChatService {
             return;
         }
 
+        if ("INDIVIDUAL".equals(state.getRoleType()) && asksSellerOnlyAnalytics(q)) {
+            blockRequest(
+                    state,
+                    user,
+                    "Seller analytics access",
+                    "Individual user requested seller-only analytics",
+                    "This question requires a corporate seller account. Individual users can ask about their own orders, purchased products, reviews, or shipments."
+            );
+            return;
+        }
+
         if (SQLI_INTENT_PATTERN.matcher(q).find()) {
             blockRequest(
                     state,
@@ -1097,6 +1108,30 @@ public class MultiAgentChatService {
                 || q.contains("en fazla satan")
                 || q.contains("en fazla satilan");
         return productTerm && soldMostTerm;
+    }
+
+    private boolean asksSellerOnlyAnalytics(String q) {
+        if (asksForMostSoldProducts(q)) {
+            return true;
+        }
+
+        boolean productOrStoreOwnership = containsAny(q,
+                "my product", "my products", "urunum", "urunlerim", "magazam", "magazamdaki", "store", "magaza");
+        boolean sellerMetric = containsAny(q,
+                "sold", "selling", "sales", "revenue", "stock", "inventory",
+                "satan", "satilan", "satis", "ciro", "gelir", "stok");
+        if (productOrStoreOwnership && sellerMetric) {
+            return true;
+        }
+
+        boolean customerAnalytics = containsAny(q, "customer", "customers", "musteri", "musteriler")
+                && containsAny(q, "top", "valuable", "distribution", "degerli", "dagilim", "en iyi");
+        boolean storeAnalytics = containsAny(q, "store", "stores", "magaza", "magazalar")
+                && containsAny(q, "sales", "revenue", "compare", "ciro", "gelir", "satis", "karsilastir");
+        boolean inventoryAnalytics = containsAny(q, "stock", "inventory", "stok")
+                && containsAny(q, "product", "products", "urun", "urunler");
+
+        return customerAnalytics || storeAnalytics || inventoryAnalytics;
     }
 
     private boolean asksCurrentMonth(String q) {
